@@ -83,7 +83,9 @@ const checkNoti = async () => {
             // Cache Update
             await LiveCache.findOneAndUpdate(
                 { fixtureId: fid }, 
-                {
+                {   
+                    home: m.teams.home.name,    // ထပ်ဖြည့်လိုက်ပါ
+                    away: m.teams.away.name,    // ထပ်ဖြည့်လိုက်ပါ
                     score: `${m.goals.home}-${m.goals.away}`,
                     elapsed: m.fixture.status.elapsed,
                     lastUpdated: new Date()
