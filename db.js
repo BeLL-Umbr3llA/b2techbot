@@ -37,11 +37,14 @@ const matchSchema = new mongoose.Schema({
 
 const liveCacheSchema = new mongoose.Schema({
     fixtureId: { type: Number, unique: true },
+    home: String,   // အသင်းနာမည် သိမ်းရန် ထပ်ဖြည့်ပါ
+    away: String,   // အသင်းနာမည် သိမ်းရန် ထပ်ဖြည့်ပါ
     score: String,
     elapsed: Number,
-    events: Array, // Goals, Players, Time အကုန်ပါမယ်
+    events: Array, 
     lastUpdated: { type: Date, default: Date.now }
 });
+
 
 const userSchema = new mongoose.Schema({
     userId: Number,
