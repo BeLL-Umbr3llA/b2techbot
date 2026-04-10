@@ -75,11 +75,7 @@ const checkNoti = async () => {
                                    `🕒 Time: ${m.fixture.status.elapsed}' (Minute)`;
 
                     // Logo ပုံကို အရင်ပို့ပြီး စာသားကို Caption မှာ ထည့်မယ်
-                    await bot.api.sendPhoto(user.userId, scoringTeamLogo, {
-                        caption: goalMsg,
-                        parse_mode: "Markdown"
-                    }).catch(e => console.error("Photo Error:", e.message));
-                }
+                    
                   await bot.api.sendPhoto(GROUP_ID, scoringTeamLogo, {
                     caption: goalMsg,
                     parse_mode: "Markdown",
