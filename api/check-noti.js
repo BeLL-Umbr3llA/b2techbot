@@ -1,9 +1,11 @@
 require('dotenv').config();
 const { Bot } = require("grammy");
 const { connectDB, User, LiveCache, Match } = require("../db");
-
 const bot = new Bot(process.env.BOT_TOKEN);
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
+
+const GROUP_ID = process.env.GROUP_ID || -3726917388; // -100...
+const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID || 2; // Topic (Thread) ID
 
 const checkNoti = async () => {
     try {
@@ -78,6 +80,12 @@ const checkNoti = async () => {
                         parse_mode: "Markdown"
                     }).catch(e => console.error("Photo Error:", e.message));
                 }
+                  await bot.api.sendPhoto(GROUP_ID, scoringTeamLogo, {
+                    caption: goalMsg,
+                    parse_mode: "Markdown",
+                    message_thread_id: TARGET_TOPIC_ID 
+                }).catch(e => console.error("Goal Photo Error:", e.message));
+            }
             }
 
             // Cache Update
