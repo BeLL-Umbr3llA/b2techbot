@@ -4,7 +4,7 @@ const { connectDB, User, LiveCache, Match } = require("../db");
 const bot = new Bot(process.env.BOT_TOKEN);
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
 
-const GROUP_ID = process.env.GROUP_ID || -3726917388; // -100...
+const GROUP_ID = process.env.GROUP_ID || -1003726917388; // -100...
 const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID || 2; // Topic (Thread) ID
 
 const checkNoti = async () => {
