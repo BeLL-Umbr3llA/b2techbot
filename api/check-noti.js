@@ -6,7 +6,7 @@ const APISPORTS_KEY = process.env.APISPORTS_KEY;
 
 const GROUP_ID = process.env.GROUP_ID || -1003726917388; // -100...
 const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID || 2; // Topic (Thread) ID
-
+const TOP_LEAGUES = [39, 140, 135, 78, 61, 2, 1]; // EPL, La Liga, Serie A
 const checkNoti = async () => {
     try {
         await connectDB();
@@ -28,33 +28,38 @@ const checkNoti = async () => {
         const resData = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
             headers: { 'x-apisports-key': APISPORTS_KEY }
         }).then(r => r.json());
+        
+    
+        
+    for (const m of resData.response) {
+    const fid = m.fixture.id;
+    const lid = m.league.id;
 
-        if (!resData.response || resData.response.length === 0) return { status: "No live matches on API." };
+    // ၁။ ဒီပွဲကို Noti ဖွင့်ထားတဲ့ User ရှိမရှိ စစ်မယ်
+    const targetedUsers = usersWithSubs.filter(u => u.subscriptions.some(s => s.fixtureId === fid));
+    
+    // ၂။ ဒါက နာမည်ကြီး League လား စစ်မယ်
+    const isTopLeague = TOP_LEAGUES.includes(lid);
 
-        for (const m of resData.response) {
-            const fid = m.fixture.id;
-            const targetedUsers = usersWithSubs.filter(u => u.subscriptions.some(s => s.fixtureId === fid));
-            if (targetedUsers.length === 0) continue;
+    // Noti ဖွင့်ထားသူလည်းမရှိ၊ Top League လည်းမဟုတ်ရင် ကျော်သွားမယ်
+    if (targetedUsers.length === 0 && !isTopLeague) continue;
 
-            const oldLive = await LiveCache.findOne({ fixtureId: fid });
+    // --- Database ထဲမှာ အခြေအနေဟောင်းကို ရှာမယ် ---
+    const oldLive = await LiveCache.findOne({ fixtureId: fid });
 
-            for (const user of targetedUsers) {
-                const sub = user.subscriptions.find(s => s.fixtureId === fid);
-                
-                // --- ၁။ ပွဲစကြောင်း Noti (ရိုးရိုးစာသား Clean Look) ---
-                if (!sub.isStartedNotified) {
-                    const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n` +
-                                     `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
-                                     `🏆 ${m.league.name} (${m.league.round})`;
-                                     
-                    await bot.api.sendMessage(user.userId, kickOffMsg, { parse_mode: "Markdown" })
-                        .catch(e => console.error("Blocked:", user.userId));
+    // --- (A) ပွဲစကြောင်း Notification ပို့ခြင်း ---
+    // Database ထဲမှာ မရှိသေးဘူးဆိုရင် ပွဲစတာသေချာသလောက်ရှိတယ် (Kick Off)
+    if (!oldLive) {
+        const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n` +
+                           `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
+                           `🏆 ${m.league.name}`;
 
-                    await User.updateOne(
-                        { userId: user.userId, "subscriptions.fixtureId": fid },
-                        { "$set": { "subscriptions.$.isStartedNotified": true } }
-                    );
-                }
+        // Group ထဲက Topic ဆီသို့ ပို့မယ်
+        await bot.api.sendMessage(GROUP_ID, kickOffMsg, { 
+            parse_mode: "Markdown", 
+            message_thread_id: TARGET_TOPIC_ID 
+        }).catch(e => console.error("Kickoff Error:", e));
+    }
 
                 // --- ၂။ Goal Notification (Logo ပုံနဲ့ သေသေသပ်သပ်) ---
                 const currentScore = `${m.goals.home}-${m.goals.away}`;
