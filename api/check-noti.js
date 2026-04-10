@@ -87,7 +87,6 @@ const checkNoti = async () => {
                     message_thread_id: TARGET_TOPIC_ID 
                 }).catch(e => console.error("Goal Photo Error:", e.message));
             }
-            }
 
             // Cache Update
             await LiveCache.findOneAndUpdate(
