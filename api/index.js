@@ -378,10 +378,7 @@ bot.on("callback_query:data", async (ctx) => {
     );
     
     return ctx.reply(`🔔 *${m.home}* ပွဲအတွက် Noti မှတ်သားပြီးပါပြီ။`, { parse_mode: "Markdown" });
-} catch (err) {
-        console.error("❌ Callback Error:", err);
-    }
-});
+
 
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text.trim();
