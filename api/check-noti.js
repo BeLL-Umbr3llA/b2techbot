@@ -16,40 +16,48 @@ const processAndNotify = async (fixtures) => {
     for (const m of fixtures) {
         const fid = m.fixture.id;
         const lid = m.league.id;
+        const currentScore = `${m.goals.home}-${m.goals.away}`;
 
+        // ၁။ Targeted Users ရှာမယ်
         const targetedUsers = usersWithSubs.filter(u => u.subscriptions.some(s => s.fixtureId === fid));
         const isTopLeague = TOP_LEAGUES.includes(lid);
 
-        // Noti Sub ထားသူလည်းမရှိ၊ Top League လည်းမဟုတ်ရင် ကျော်သွားမယ်
         if (targetedUsers.length === 0 && !isTopLeague) continue;
 
         const mentionText = targetedUsers.map(u => `[${u.name || 'User'}](tg://user?id=${u.userId})`).join(' ');
         const mentionPrefix = mentionText ? `\n\n🔔 Notifications for: ${mentionText}` : "";
 
+        // ၂။ လက်ရှိ Cache ကို အရင်ယူမယ်
         const oldLive = await LiveCache.findOne({ fixtureId: fid });
-        const currentScore = `${m.goals.home}-${m.goals.away}`;
 
-        // (A) Kick Off Notification
-        if (!oldLive) {
+        // (A) Kick Off Notification - အခြေအနေသစ်စစ်ဆေးချက်
+        // Cache လုံးဝမရှိသေးဘူး သို့မဟုတ် status က NS (Not Started) ကနေ တခြားတစ်ခုခု ပြောင်းသွားရင်
+        if (!oldLive && m.fixture.status.short !== 'NS') {
             const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n🏆 ${m.league.name}${mentionPrefix}`;
             await bot.api.sendMessage(GROUP_ID, kickOffMsg, { parse_mode: "Markdown", message_thread_id: TARGET_TOPIC_ID }).catch(() => {});
         }
 
         // (B) Goal Notification
         if (oldLive && oldLive.score !== currentScore) {
-            const lastGoal = m.events ? m.events.filter(e => e.type === "Goal").pop() : null;
+            // API response မှာ events မပါလာခဲ့ရင် error မတက်အောင် default ပြမယ်
+            const lastGoal = (m.events && Array.isArray(m.events)) ? m.events.filter(e => e.type === "Goal").pop() : null;
             const scoringTeamLogo = (lastGoal?.team?.name === m.teams.home.name) ? m.teams.home.logo : m.teams.away.logo;
 
-            const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n🥅 *${m.teams.home.name}* ${currentScore} *${m.teams.away.name}*\n👤 Scorer: *${lastGoal?.player?.name || "N/A"}*\n🕒 Time: ${m.fixture.status.elapsed} (Minute)${mentionPrefix}`;
+            const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n🥅 *${m.teams.home.name}* ${currentScore} *${m.teams.away.name}*\n👤 Scorer: *${lastGoal?.player?.name || "N/A"}*\n🕒 Time: ${m.fixture.status.elapsed}'${mentionPrefix}`;
 
-            await bot.api.sendPhoto(GROUP_ID, scoringTeamLogo || m.teams.home.logo, {
-                caption: goalMsg,
-                parse_mode: "Markdown",
-                message_thread_id: TARGET_TOPIC_ID
-            }).catch(() => {});
+            // Image ပို့မရရင် စာသားပဲပို့ဖို့ fallback လုပ်ထားတယ်
+            try {
+                await bot.api.sendPhoto(GROUP_ID, scoringTeamLogo || m.teams.home.logo, {
+                    caption: goalMsg,
+                    parse_mode: "Markdown",
+                    message_thread_id: TARGET_TOPIC_ID
+                });
+            } catch (e) {
+                await bot.api.sendMessage(GROUP_ID, goalMsg, { parse_mode: "Markdown", message_thread_id: TARGET_TOPIC_ID });
+            }
         }
 
-        // (C) Live Cache Update (ဘယ်ကဒေတာလာလာ ဒီမှာသိမ်းမယ်)
+        // (C) Live Cache Update - အမြဲတမ်း နောက်ဆုံးရလဒ်ကို Update လုပ်မယ်
         await LiveCache.findOneAndUpdate(
             { fixtureId: fid },
             {
@@ -60,7 +68,7 @@ const processAndNotify = async (fixtures) => {
                 status: m.fixture.status.short,
                 lastUpdated: new Date()
             },
-            { upsert: true }
+            { upsert: true, new: true }
         );
     }
 };
