@@ -105,7 +105,6 @@ async function syncAndNotify(targetFixtureId) {
         console.error("❌ Noti API Forward Error:", err.response?.data || err.message);
     }
 }
-
         return liveFixtures;
         
     } catch (error) {
