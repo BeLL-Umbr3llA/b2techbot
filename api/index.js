@@ -382,7 +382,7 @@ bot.on("callback_query:data", async (ctx) => {
     } catch (err) {
         console.error("❌ Callback Error:", err);
     }
-}); /
+}); 
 
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text.trim();
