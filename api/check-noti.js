@@ -44,8 +44,15 @@ const processAndNotify = async (fixtures) => {
             continue; 
         }
 
-        const mentionText = targetedUsers.map(u => `[${u.name || 'User'}](tg://user?id=${u.userId})`).join(' ');
-        const mentionPrefix = mentionText ? `\n\n🔔 Notifications for: ${mentionText}` : "";
+     // targetedUsers ထဲမှာ DB ကလာတဲ့ user list ရှိတယ်
+const mentionText = targetedUsers.map(u => {
+    // Markdown format: [Display Name](tg://user?id=USER_ID)
+    const displayName = u.name || u.username || 'User';
+    return `[${displayName}](tg://user?id=${u.userId})`;
+}).join(' ');
+
+// Mention Prefix ကို စာသားသစ်နဲ့ တွဲမယ်
+const mentionPrefix = mentionText ? `\n\n🔔 ပွဲစဉ်စောင့်ကြည့်နေသူများ - ${mentionText}` : "";
 
         const oldLive = await LiveCache.findOne({ fixtureId: fid });
 
