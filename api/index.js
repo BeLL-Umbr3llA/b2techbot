@@ -139,16 +139,22 @@ async function sendMatchDetail(ctx, m) {
         }
 
         // --- အခြေအနေ (၂) - ပွဲစနေပြီဆိုလျှင် Live Cache မှာအရင်ရှာ ---
-        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-        const isOld = cache && (Date.now() - new Date(cache.updatedAt).getTime() > 3 * 60 * 1000);
+        // updatedAt ကို အမြဲတမ်း Date object အဖြစ်ပြောင်းပြီးမှ အချိန် (ms) ကို ယူပါ
+        
+        const cacheTime = new Date(cache.updatedAt).getTime();
+        const currentTime = Date.now();
+        const diffMinutes = (currentTime - cacheTime) / (1000 * 60);
 
+        const isOld = diffMinutes > 3; // ၃ မိနစ်ကျော်ရင် true ဖြစ်မယ်
         // --- အခြေအနေ (၃) - Cache မရှိလျှင် သို့မဟုတ် ဒေတာဟောင်းနေလျှင် API Call & Sync ---
         if (!cache || isOld) {
-            await syncAndNotify(m.fixtureId);
-            
-            // API ပို့ပြီး Noti API က DB ထဲသိမ်းချိန်ကို ခဏစောင့်ပေးမယ် (1.5 sec)
-            await new Promise(r => setTimeout(r, 1500));
-            cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+                console.log(`🔄 Cache is ${!cache ? 'missing' : 'stale'}. Syncing...`);
+                await syncAndNotify(m.fixtureId);
+    
+                // ခဏစောင့်ပြီး DB ကို ပြန်စစ်မယ်
+                await new Promise(r => setTimeout(r, 2000)); 
+                cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+                console.log("✅ New Cache Data:", cache.score);
         }
 
         // ရလဒ် ထုတ်ပြခြင်း (Live ပွဲများအတွက်)
