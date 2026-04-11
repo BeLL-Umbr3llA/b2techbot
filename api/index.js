@@ -151,7 +151,6 @@ async function sendMatchDetail(ctx, m) {
         }
 
        // ၁။ Cache ရှာပြီး အချိန်စစ်မယ်
-       // ၁။ Cache ရှာပြီး အချိန်စစ်မယ်
 let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
 let shouldFetch = false;
 
@@ -196,12 +195,27 @@ if (shouldFetch) {
     }
 }
         // ၄။ ရလဒ် ထုတ်ပြခြင်း (Final Display)
-        // sync လုပ်ပြီးလို့မှ cache မရှိသေးရင် Default 0-0 ပြမယ်
-        const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
-        let statusDisplay = cache ? `ပွဲကစားနေသည် (${cache.elapsed}')` : "ပွဲစတင်နေပါပြီ";
+      const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
         
-        if (cache && ['FT', 'AET', 'PEN'].includes(cache.status)) {
-            statusDisplay = "ပွဲပြီးဆုံးသွားပါပြီ (Full Time)";
+        // Status အလိုက် စာသားပြောင်းလဲခြင်း
+        let statusDisplay = "";
+        if (cache) {
+            switch (cache.status) {
+                case 'HT':
+                    statusDisplay = "🔴 *Half Time (ပိုင်းဝက်နားချိန်)*";
+                    break;
+                case 'FT':
+                    statusDisplay = "🏁 *ပွဲပြီးဆုံးသွားပါပြီ (Full Time)*";
+                    break;
+                case '1H':
+                case '2H':
+                    statusDisplay = `⚽ *ပွဲကစားနေသည် (${cache.elapsed}')*`;
+                    break;
+                default:
+                    statusDisplay = `🕒 *အခြေအနေ:* ${cache.status} (${cache.elapsed}')`;
+            }
+        } else {
+            statusDisplay = "🕒 *အခြေအနေ:* ပွဲစတင်နေပါပြီ";
         }
 
         const msg = 
