@@ -146,6 +146,11 @@ if (req.method === 'GET') {
     }).then(r => r.json());
 
     if (resData.response && resData.response.length > 0) {
+        await LiveCache.findOneAndUpdate(
+            { type: "global_sync_timer" },
+            { lastUpdated: now },
+            { upsert: true }
+        );
         await processAndNotify(resData.response);
         return res.status(200).send("Cron sync completed.");
     }
