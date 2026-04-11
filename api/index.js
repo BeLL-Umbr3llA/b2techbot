@@ -91,11 +91,20 @@ async function syncAndNotify(targetFixtureId) {
     
         // --- Notification API ဆီ ဒေတာပို့ခြင်း ---
         // ဤနေရာတွင် check-noti.js သည် ဒေတာလက်ခံပြီး Noti ပို့ခြင်းနှင့် LiveCache Update လုပ်ခြင်းကို တာဝန်ယူရမည်
+       
         if (liveFixtures.length > 0) {
-            await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
-                fixtures: liveFixtures
-            }).catch(err => console.error("❌ Noti API Forward Error:", err.message));
-        }
+    try {
+        const response = await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
+            fixtures: liveFixtures
+        });
+
+        // API ဘက်က ပြန်ပို့လိုက်တဲ့ data (res.send ထဲကဟာ) ကို console မှာ ပြပါမယ်
+        console.log("✅ Noti API Response:", response.data);
+    } catch (err) {
+        // Error တက်ရင်လည်း အသေးစိတ် သိရအောင် error response ကို ပြပါမယ်
+        console.error("❌ Noti API Forward Error:", err.response?.data || err.message);
+    }
+}
 
         return liveFixtures;
         
