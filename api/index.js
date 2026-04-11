@@ -294,23 +294,54 @@ bot.command("match", async (ctx) => {
         });
     } catch (err) { console.error("❌ Match Error:", err); }
 });
-
 bot.command("live", async (ctx) => {
     try {
         await connectDB();
-        const liveMatches = await LiveCache.find();
-        if (liveMatches.length === 0) return ctx.reply("⚽️ လောလောဆယ် Live ကစားနေသည့်ပွဲ မရှိပါ။", { message_thread_id: TARGET_TOPIC_ID });
+
+        // ၁။ အရင်ဆုံး Top Leagues ထဲက Live ဖြစ်နေတဲ့ပွဲတွေကို အရင်ရှာမယ်
+        // TOP_LEAGUES array ထဲမှာ ပါတဲ့ league ID တွေကို ဦးစားပေးမယ်
+        const topLeaguesList = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
+        
+        // DB ထဲမှာ leagueId သိမ်းထားတာ ရှိမရှိပေါ်မူတည်ပြီး logic စစ်မယ်
+        // (မှတ်ချက် - သင့် LiveCache schema မှာ leagueId သိမ်းထားဖို့ လိုပါတယ်)
+        let liveMatches = await LiveCache.find({ 
+            leagueId: { $in: topLeaguesList } 
+        }).limit(10);
+
+        // ၂။ အကယ်၍ Top League ပွဲတွေ မရှိဘူးဆိုရင် (ဥပမာ ပွဲချိန်မဟုတ်ရင်)
+        // တခြား ရှိသမျှ Live ပွဲတွေကို ၁၀ ပွဲအထိ ဆွဲထုတ်ပြမယ်
+        if (liveMatches.length === 0) {
+            liveMatches = await LiveCache.find()
+                .sort({ lastUpdated: -1 }) // နောက်ဆုံးဖြစ်တဲ့ပွဲတွေ အရင်ပြ
+                .limit(10);
+        }
+
+        if (liveMatches.length === 0) {
+            return ctx.reply("⚽️ လောလောဆယ် Live ကစားနေသည့်ပွဲ မရှိပါ။", { 
+                message_thread_id: TARGET_TOPIC_ID 
+            });
+        }
 
         const kb = new InlineKeyboard();
         liveMatches.forEach(m => {
-            kb.text(`${m.home} ${m.score} ${m.away}`, `sh_${m.fixtureId}`).row();
+            const score = m.score || "0-0";
+            kb.text(`${m.home} ${score} ${m.away}`, `sh_${m.fixtureId}`).row();
         });
-        await ctx.reply("🔴 *LIVE SCORES*", { 
+
+        const title = liveMatches.some(m => topLeaguesList.includes(Number(m.leagueId))) 
+                      ? "🔴 *TOP LEAGUE LIVE SCORES*" 
+                      : "🔴 *ALL LIVE SCORES (Top 10)*";
+
+        await ctx.reply(title, { 
             parse_mode: "Markdown", 
             reply_markup: kb,
             message_thread_id: TARGET_TOPIC_ID 
         });
-    } catch (err) { console.error("❌ Live Error:", err); }
+
+    } catch (err) { 
+        console.error("❌ Live Error:", err); 
+        ctx.reply("⚠️ Live data ပြရာတွင် အမှားရှိနေပါသည်။");
+    }
 });
 
 // --- ၄။ Handlers ---
