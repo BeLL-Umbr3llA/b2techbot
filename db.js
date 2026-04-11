@@ -35,15 +35,16 @@ const matchSchema = new mongoose.Schema({
     lastUpdated: { type: Date, default: Date.now }
 });
 
-const liveCacheSchema = new mongoose.Schema({
-    fixtureId: { type: Number, unique: true },
-    home: String,   // အသင်းနာမည် သိမ်းရန် ထပ်ဖြည့်ပါ
-    away: String,   // အသင်းနာမည် သိမ်းရန် ထပ်ဖြည့်ပါ
+const LiveCacheSchema = new mongoose.Schema({
+    type: { type: String, default: "match_data" }, 
+    fixtureId: { type: Number },
+    home: String,
+    away: String,
     score: String,
     elapsed: Number,
-    events: Array, 
+    status: String, // ဤနေရာတွင် HT, FT, 1H, 2H စသည်တို့ သိမ်းမည်
     lastUpdated: { type: Date, default: Date.now }
-});
+}, { strict: false, timestamps: true });
 
 
 const userSchema = new mongoose.Schema({
