@@ -75,10 +75,13 @@ module.exports = async (req, res) => {
             const { fixtures } = req.body;
             if (fixtures && Array.isArray(fixtures)) {
                 await processAndNotify(fixtures);
+                console.log("Data synced and updated");
                 return res.status(200).send("Data synced and updated.");
             }
             return res.status(400).send("Invalid fixtures data.");
-        }// ၂။ Cron Job (GET) နဲ့ နှိုးလာရင် (Schedule အရ ဝင်လာတာ)
+        }
+        
+        // ၂။ Cron Job (GET) နဲ့ နှိုးလာရင် (Schedule အရ ဝင်လာတာ)
 if (req.method === 'GET') {
     const now = new Date();
 
