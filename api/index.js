@@ -349,22 +349,36 @@ bot.on("callback_query:data", async (ctx) => {
             if (m) return sendMatchDetail(ctx, m);
         }
 
-        if (data.startsWith("sub_")) {
-            const fid = Number(data.split("_")[1]);
-            const m = await Match.findOne({ fixtureId: fid });
-            if (!m) return ctx.reply("❌ ပွဲစဉ်မတွေ့ပါ။", { message_thread_id: TARGET_TOPIC_ID });
+    if (data.startsWith("sub_")) {
+    const fid = Number(data.split("_")[1]);
+    const m = await Match.findOne({ fixtureId: fid });
+    if (!m) return ctx.reply("❌ ပွဲစဉ်မတွေ့ပါ။");
 
-            await User.updateOne(
-                { userId: ctx.from.id },
-                { $addToSet: { subscriptions: { fixtureId: fid, home: m.home, away: m.away, isStartedNotified: false } } },
-                { upsert: true }
-            );
-            return ctx.reply(`🔔 *${escapeMarkdown(m.home)}* ပွဲအတွက် Notification\n မှတ်သားပေးထားပြီးပါပြီခင်ဗျာ။`, { 
-                parse_mode: "Markdown",
-                message_thread_id: TARGET_TOPIC_ID 
-            });
-        }
-    } catch (err) {
+    // User ရဲ့ အမည်ကို ယူမယ် (FirstName သို့မဟုတ် Username)
+    const fullName = ctx.from.first_name + (ctx.from.last_name ? " " + ctx.from.last_name : "");
+    const tgUsername = ctx.from.username || fullName; // username မရှိရင် နာမည်ကို သုံးမယ်
+
+    await User.updateOne(
+        { userId: ctx.from.id },
+        { 
+            $set: { 
+                name: fullName, 
+                username: ctx.from.username 
+            },
+            $addToSet: { 
+                subscriptions: { 
+                    fixtureId: fid, 
+                    home: m.home, 
+                    away: m.away, 
+                    isStartedNotified: false 
+                } 
+            } 
+        },
+        { upsert: true }
+    );
+    
+    return ctx.reply(`🔔 *${m.home}* ပွဲအတွက် Noti မှတ်သားပြီးပါပြီ။`, { parse_mode: "Markdown" });
+} catch (err) {
         console.error("❌ Callback Error:", err);
     }
 });
