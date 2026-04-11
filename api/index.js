@@ -136,29 +136,35 @@ async function sendMatchDetail(ctx, m) {
             });
         }
 
-        // --- အခြေအနေ (၂) - ပွဲစနေပြီဆိုလျှင် Live Cache မှာအရင်ရှာ ---
-        // cache ကို let နဲ့ ကြေညာပေးရပါမယ် (ဒါမှ အောက်မှာ တန်ဖိုးပြန်ထည့်လို့ရမှာပါ)
-        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+       
+      // ၁။ Cache ကို ရှာတယ်
+let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
 
-        // cache ရှိမှသာ အချိန်ကို တွက်ချက်မယ်
-        let isOld = true; 
-        if (cache && (cache.updatedAt || cache.lastUpdated)) {
-            // သင့် DB schema အရ updatedAt သို့မဟုတ် lastUpdated ကို သုံးပါ
-            const lastTime = new Date(cache.updatedAt || cache.lastUpdated).getTime();
-            const currentTime = Date.now();
-            const diffMinutes = (currentTime - lastTime) / (1000 * 60);
-            isOld = diffMinutes > 3;
+// ၂။ အချိန်ကွာခြားချက်ကို တွက်ချက်ပုံ သေချာစစ်ပါ
+let isOld = true;
+if (cache) {
+    // DB ထဲမှာ သိမ်းတဲ့ field နာမည်က lastUpdated ဖြစ်နေတတ်လို့ နှစ်မျိုးလုံးစစ်ပါ
+    const lastUpdateTime = cache.lastUpdated || cache.updatedAt; 
+    
+    if (lastUpdateTime) {
+        const diffMs = Date.now() - new Date(lastUpdateTime).getTime();
+        const diffMins = diffMs / (1000 * 60);
+        
+        // ၃ မိနစ် မကျော်သေးရင် isOld ကို false ပေးလိုက်ပါ
+        if (diffMins < 3) {
+            isOld = false;
         }
+    }
+}
 
-        // --- အခြေအနေ (၃) - Cache မရှိလျှင် သို့မဟုတ် ဒေတာဟောင်းနေလျှင် API Call & Sync ---
-        if (!cache || isOld) {
-            console.log(`🔄 Cache is ${!cache ? 'missing' : 'stale'}. Syncing for ${m.home}...`);
-            await syncAndNotify(m.fixtureId);
-
-            // API ဘက်က DB ထဲသိမ်းချိန်ကို ခဏစောင့်ပေးမယ်
-            await new Promise(r => setTimeout(r, 2000)); 
-            cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-        }
+// ၃။ isOld က true (ဟောင်းနေမှ) သာလျှင် API ခေါ်မယ်
+if (!cache || isOld) {
+    console.log(`📡 [API Call] Data is ${!cache ? 'missing' : 'stale'}. Syncing...`);
+    await syncAndNotify(m.fixtureId);
+    // ... ကျန်တဲ့ code များ
+} else {
+    console.log(`✅ [Cache Hit] Using existing data for ${m.home}.`);
+}
 
         // ရလဒ် ထုတ်ပြခြင်း
         // cache ပြန်ရှာလို့မှ မတွေ့သေးရင် default တန်ဖိုးတွေပေးထားမယ်
