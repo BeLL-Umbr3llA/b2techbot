@@ -61,13 +61,36 @@ const escapeMarkdown = (text) => {
 
 async function syncAndNotify(targetFixtureId) {
     try {
-        // သတ်မှတ်ထားတဲ့ Top Leagues IDs များ
+        await connectDB();
+        const now = new Date();
+        
+        // --- Global Sync Lock စစ်ဆေးခြင်း ---
+        const globalTimer = await LiveCache.findOne({ type: "global_sync_timer" });
+        if (globalTimer) {
+            const lastSync = new Date(globalTimer.lastUpdated).getTime();
+            const diffSecs = (now.getTime() - lastSync) / 1000;
+            
+            // ၁၈၀ စက္ကန့် (၃ မိနစ်) မပြည့်သေးရင် API မခေါ်တော့ဘူး
+            if (diffSecs < 180) {
+                console.log(`⏳ [Rate Limit] Global sync was done ${Math.round(diffSecs)}s ago. Skipping API...`);
+                // လက်ရှိ DB ထဲမှာရှိနေတဲ့ Live data တွေကိုပဲ ပြန်ပေးလိုက်မယ်
+                const existingLive = await LiveCache.find({ fixtureId: { $exists: true } });
+                return existingLive.map(l => ({
+                    fixture: { id: l.fixtureId, status: { short: l.status, elapsed: l.elapsed } },
+                    goals: { home: Number(l.score.split('-')[0]), away: Number(l.score.split('-')[1]) },
+                    teams: { home: { name: l.home }, away: { name: l.away } }
+                }));
+            }
+        }
+
+        // --- ၃ မိနစ်ကျော်မှသာ အောက်က API ခေါ်တဲ့အပိုင်းကို အလုပ်လုပ်မယ် ---
+        console.log("📡 [API Call] 3 minutes passed. Fetching all live matches...");
         const topLeagues = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
         
         const options = {
             method: 'GET',
             url: 'https://v3.football.api-sports.io/fixtures',
-            params: { live: 'all' }, // League မကန့်သတ်ဘဲ Live အကုန်ဆွဲထုတ်မယ် (API 1 call ပဲ ကုန်မယ်)
+            params: { live: 'all' },
             headers: {
                 'x-rapidapi-key': process.env.APISPORTS_KEY,
                 'x-rapidapi-host': 'v3.football.api-sports.io'
@@ -77,21 +100,24 @@ async function syncAndNotify(targetFixtureId) {
         const response = await axios.request(options);
         const allLiveFixtures = response.data.response;
 
-        // --- Filter Logic ---
-        // ၁။ Top Leagues ထဲမှာ ပါတဲ့ ပွဲတွေကိုပဲ စစ်ထုတ်မယ်
-        // ၂။ ဒါမှမဟုတ် User ရှာနေတဲ့ targetFixtureId ဖြစ်နေရင်လည်း ထည့်မယ်
+        // Global Timer ကို Update လုပ်မယ်
+        await LiveCache.findOneAndUpdate(
+            { type: "global_sync_timer" },
+            { lastUpdated: now },
+            { upsert: true }
+        );
+
         const filteredFixtures = allLiveFixtures.filter(f => 
             topLeagues.includes(f.league.id) || f.fixture.id === Number(targetFixtureId)
         );
-// syncAndNotify function ထဲက ဒီအပိုင်းကို ပြင်ပါ
-if (filteredFixtures.length > 0) {
-    // await မသုံးတော့ဘဲ နောက်ကွယ်မှာ ပို့ခိုင်းလိုက်ပါ (Fire and Forget)
-    axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
-        fixtures: filteredFixtures
-    }).catch(err => console.error("❌ Noti API Async Error:", err.message));
-    
-    console.log(`✅ Cache Update request sent for ${filteredFixtures.length} matches.`);
-}
+
+        if (filteredFixtures.length > 0) {
+            axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
+                fixtures: filteredFixtures
+            }).catch(err => console.error("❌ Noti API Async Error:", err.message));
+            
+            console.log(`✅ Cache Update sent for ${filteredFixtures.length} matches.`);
+        }
         
         return filteredFixtures;
         
@@ -125,38 +151,50 @@ async function sendMatchDetail(ctx, m) {
         }
 
        // ၁။ Cache ရှာပြီး အချိန်စစ်မယ်
-        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-        let shouldFetch = false;
+       // ၁။ Cache ရှာပြီး အချိန်စစ်မယ်
+let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+let shouldFetch = false;
 
-        if (!cache) {
-            shouldFetch = true;
-        } else {
-            const lastUpdated = cache.lastUpdated || cache.updatedAt;
-            const diffMins = (Date.now() - new Date(lastUpdated).getTime()) / (1000 * 60);
-            
-            if (diffMins >= 3) {
-                shouldFetch = true;
-            } else {
-                // ၃ မိနစ်မပြည့်သေးရင် Cache ကိုပဲ သုံးမယ်
-                console.log(`✅ [Cache Hit] Data is fresh for ${m.home} (${diffMins.toFixed(1)} mins old).`);
-            }
-        }
+// Global Timer ကိုပါ တွဲစစ်မယ် (တစ်ခါခေါ်ရင် ပွဲအားလုံးအတွက် data ရလို့)
+const globalTimer = await LiveCache.findOne({ type: "global_sync_timer" });
+const nowTs = Date.now();
 
-        // ၂။ လိုအပ်မှ API ခေါ်မယ်
-        if (shouldFetch) {
-            console.log(`📡 [API Call] Fetching new data for ${m.home}...`);
-            const freshFixtures = await syncAndNotify(m.fixtureId);
-            const freshMatch = freshFixtures.find(f => f.fixture.id === Number(m.fixtureId));
-            
-            if (freshMatch) {
-                cache = {
-                    score: `${freshMatch.goals.home}-${freshMatch.goals.away}`,
-                    elapsed: freshMatch.fixture.status.elapsed,
-                    status: freshMatch.fixture.status.short,
-                    lastUpdated: new Date()
-                };
-            }
-        }
+if (!cache) {
+    // ပွဲစဉ်အတွက် cache မရှိရင်တောင် Global call က ၃ မိနစ်အတွင်း ခေါ်ထားရင် မခေါ်တော့ဘူး
+    if (globalTimer) {
+        const globalDiff = (nowTs - new Date(globalTimer.lastUpdated).getTime()) / (1000 * 60);
+        if (globalDiff >= 3) shouldFetch = true;
+    } else {
+        shouldFetch = true;
+    }
+} else {
+    const lastUpdated = cache.lastUpdated || cache.updatedAt;
+    const diffMins = (nowTs - new Date(lastUpdated).getTime()) / (1000 * 60);
+    
+    if (diffMins >= 3) {
+        shouldFetch = true;
+    } else {
+        console.log(`✅ [Cache Hit] Data is fresh for ${m.home} (${diffMins.toFixed(1)} mins old).`);
+    }
+}
+
+// ၂။ လိုအပ်မှ API ခေါ်မယ်
+if (shouldFetch) {
+    console.log(`📡 [API Call] Requesting update for ${m.home}...`);
+    const freshFixtures = await syncAndNotify(m.fixtureId); 
+    
+    // syncAndNotify ထဲမှာ ၃ မိနစ်ထပ်စစ်တဲ့ logic (Global Lock) ပါဖို့ အရေးကြီးပါတယ်
+    const freshMatch = freshFixtures.find(f => f.fixture.id === Number(m.fixtureId));
+    
+    if (freshMatch) {
+        cache = {
+            score: `${freshMatch.goals.home}-${freshMatch.goals.away}`,
+            elapsed: freshMatch.fixture.status.elapsed,
+            status: freshMatch.fixture.status.short,
+            lastUpdated: new Date()
+        };
+    }
+}
         // ၄။ ရလဒ် ထုတ်ပြခြင်း (Final Display)
         // sync လုပ်ပြီးလို့မှ cache မရှိသေးရင် Default 0-0 ပြမယ်
         const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
