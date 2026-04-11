@@ -83,17 +83,15 @@ async function syncAndNotify(targetFixtureId) {
         const filteredFixtures = allLiveFixtures.filter(f => 
             topLeagues.includes(f.league.id) || f.fixture.id === Number(targetFixtureId)
         );
-
-        if (filteredFixtures.length > 0) {
-            try {
-                const res = await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
-                    fixtures: filteredFixtures
-                });
-                console.log(`✅ Cache Updated for ${filteredFixtures.length} matches.`);
-            } catch (err) {
-                console.error("❌ Noti API Error:", err.message);
-            }
-        }
+// syncAndNotify function ထဲက ဒီအပိုင်းကို ပြင်ပါ
+if (filteredFixtures.length > 0) {
+    // await မသုံးတော့ဘဲ နောက်ကွယ်မှာ ပို့ခိုင်းလိုက်ပါ (Fire and Forget)
+    axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
+        fixtures: filteredFixtures
+    }).catch(err => console.error("❌ Noti API Async Error:", err.message));
+    
+    console.log(`✅ Cache Update request sent for ${filteredFixtures.length} matches.`);
+}
         
         return filteredFixtures;
         
@@ -126,32 +124,39 @@ async function sendMatchDetail(ctx, m) {
             });
         }
 
-       // ၁။ Cache ကို အရင်ရှာမယ်
+       // ၁။ Cache ရှာပြီး အချိန်စစ်မယ်
         let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+        let shouldFetch = false;
 
-        // ၂။ အချိန်စစ်မယ်
-        let isOld = true;
-        if (cache) {
-            const lastUpdateTime = cache.lastUpdated || cache.updatedAt; 
-            if (lastUpdateTime) {
-                const diffMins = (Date.now() - new Date(lastUpdateTime).getTime()) / (1000 * 60);
-                if (diffMins < 3) isOld = false;
+        if (!cache) {
+            shouldFetch = true;
+        } else {
+            const lastUpdated = cache.lastUpdated || cache.updatedAt;
+            const diffMins = (Date.now() - new Date(lastUpdated).getTime()) / (1000 * 60);
+            
+            if (diffMins >= 3) {
+                shouldFetch = true;
+            } else {
+                // ၃ မိနစ်မပြည့်သေးရင် Cache ကိုပဲ သုံးမယ်
+                console.log(`✅ [Cache Hit] Data is fresh for ${m.home} (${diffMins.toFixed(1)} mins old).`);
             }
         }
 
-        // ၃။ Logic အရ API ခေါ်သင့်ရင် ခေါ်မယ်
-        if (!cache || isOld) {
-            console.log(`📡 [API Call] Syncing for ${m.home}...`);
-            await syncAndNotify(m.fixtureId);
-
-            // *** အရေးကြီးဆုံးအပိုင်း ***
-            // API က သိမ်းတာ စက္ကန့်ပိုင်းကြာနိုင်လို့ ခဏစောင့်ပြီး cache ကို ပြန်ရှာရမယ်
-            await new Promise(r => setTimeout(r, 2000)); 
-            cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-        } else {
-            console.log(`✅ [Cache Hit] Data is fresh for ${m.home}.`);
+        // ၂။ လိုအပ်မှ API ခေါ်မယ်
+        if (shouldFetch) {
+            console.log(`📡 [API Call] Fetching new data for ${m.home}...`);
+            const freshFixtures = await syncAndNotify(m.fixtureId);
+            const freshMatch = freshFixtures.find(f => f.fixture.id === Number(m.fixtureId));
+            
+            if (freshMatch) {
+                cache = {
+                    score: `${freshMatch.goals.home}-${freshMatch.goals.away}`,
+                    elapsed: freshMatch.fixture.status.elapsed,
+                    status: freshMatch.fixture.status.short,
+                    lastUpdated: new Date()
+                };
+            }
         }
-
         // ၄။ ရလဒ် ထုတ်ပြခြင်း (Final Display)
         // sync လုပ်ပြီးလို့မှ cache မရှိသေးရင် Default 0-0 ပြမယ်
         const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
