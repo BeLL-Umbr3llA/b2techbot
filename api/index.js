@@ -192,7 +192,15 @@ if (shouldFetch) {
             status: freshMatch.fixture.status.short,
             lastUpdated: new Date()
         };
-    }
+    }else if (cache && !freshMatch) {
+                // API ကနေ live data မရတော့ဘူးဆိုရင် (ပွဲပြီးလို့ list ထဲက ပျောက်သွားတာဖြစ်နိုင်)
+                // အကယ်၍ ပွဲစခဲ့တာ ကြာပြီဆိုရင် FT လို့ သတ်မှတ်ပေးလိုက်မယ်
+                const diffFromStart = (nowTs - matchTime.getTime()) / (1000 * 60 * 60);
+                if (diffFromStart > 1.8) { // ၁ နာရီ ၄၅ မိနစ်ကျော်ရင် ပွဲပြီးပြီလို့ ယူဆ
+                    cache.status = 'FT';
+                    await LiveCache.updateOne({ fixtureId: m.fixtureId }, { status: 'FT' });
+                }
+            }
 }
         // ၄။ ရလဒ် ထုတ်ပြခြင်း (Final Display)
       const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
