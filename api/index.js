@@ -325,7 +325,6 @@ bot.command("live", async (ctx) => {
 
         const kb = new InlineKeyboard();
         liveMatches.forEach(m => {
-            if (!m.home || !m.away) return;
             const score = m.score || "0-0";
             kb.text(`${m.home} ${score} ${m.away}`, `sh_${m.fixtureId}`).row();
         });
