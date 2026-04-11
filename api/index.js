@@ -61,13 +61,13 @@ const escapeMarkdown = (text) => {
 
 async function syncAndNotify(targetFixtureId) {
     try {
-        // Top Leagues: PL, La Liga, Serie A, Bundesliga, Ligue 1, UCL, Myanmar League
-        const topLeagues = [39, 140, 135, 78, 61, 2, 466]; 
+        // သတ်မှတ်ထားတဲ့ Top Leagues IDs များ
+        const topLeagues = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
         
         const options = {
             method: 'GET',
             url: 'https://v3.football.api-sports.io/fixtures',
-            params: { live: 'all', league: topLeagues.join('-') },
+            params: { live: 'all' }, // League မကန့်သတ်ဘဲ Live အကုန်ဆွဲထုတ်မယ် (API 1 call ပဲ ကုန်မယ်)
             headers: {
                 'x-rapidapi-key': process.env.APISPORTS_KEY,
                 'x-rapidapi-host': 'v3.football.api-sports.io'
@@ -75,40 +75,30 @@ async function syncAndNotify(targetFixtureId) {
         };
 
         const response = await axios.request(options);
-        let liveFixtures = response.data.response;
+        const allLiveFixtures = response.data.response;
 
-        // User ရှာတဲ့ပွဲက Top League ထဲမပါရင် အဲ့တစ်ပွဲတည်း သီးသန့်ထပ်ဆွဲမယ်
-        const isTargetFound = liveFixtures.some(f => f.fixture.id === Number(targetFixtureId));
-        if (!isTargetFound) {
-            const singleMatch = await axios.get('https://v3.football.api-sports.io/fixtures', {
-                params: { id: targetFixtureId },
-                headers: options.headers
-            });
-            if (singleMatch.data.response[0]) {
-                liveFixtures.push(singleMatch.data.response[0]);
+        // --- Filter Logic ---
+        // ၁။ Top Leagues ထဲမှာ ပါတဲ့ ပွဲတွေကိုပဲ စစ်ထုတ်မယ်
+        // ၂။ ဒါမှမဟုတ် User ရှာနေတဲ့ targetFixtureId ဖြစ်နေရင်လည်း ထည့်မယ်
+        const filteredFixtures = allLiveFixtures.filter(f => 
+            topLeagues.includes(f.league.id) || f.fixture.id === Number(targetFixtureId)
+        );
+
+        if (filteredFixtures.length > 0) {
+            try {
+                const res = await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
+                    fixtures: filteredFixtures
+                });
+                console.log(`✅ Cache Updated for ${filteredFixtures.length} matches.`);
+            } catch (err) {
+                console.error("❌ Noti API Error:", err.message);
             }
         }
-    
-        // --- Notification API ဆီ ဒေတာပို့ခြင်း ---
-        // ဤနေရာတွင် check-noti.js သည် ဒေတာလက်ခံပြီး Noti ပို့ခြင်းနှင့် LiveCache Update လုပ်ခြင်းကို တာဝန်ယူရမည်
-       
-        if (liveFixtures.length > 0) {
-    try {
-        const response = await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
-            fixtures: liveFixtures
-        });
-
-        // API ဘက်က ပြန်ပို့လိုက်တဲ့ data (res.send ထဲကဟာ) ကို console မှာ ပြပါမယ်
-        console.log("✅ Noti API Response:", response.data);
-    } catch (err) {
-        // Error တက်ရင်လည်း အသေးစိတ် သိရအောင် error response ကို ပြပါမယ်
-        console.error("❌ Noti API Forward Error:", err.response?.data || err.message);
-    }
-}
-        return liveFixtures;
+        
+        return filteredFixtures;
         
     } catch (error) {
-        console.error("❌ Sync Logic Error:", error);
+        console.error("❌ Sync Logic Error:", error.message);
         return [];
     }
 }
@@ -136,39 +126,35 @@ async function sendMatchDetail(ctx, m) {
             });
         }
 
-       
-      // ၁။ Cache ကို ရှာတယ်
-let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+       // ၁။ Cache ကို အရင်ရှာမယ်
+        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
 
-// ၂။ အချိန်ကွာခြားချက်ကို တွက်ချက်ပုံ သေချာစစ်ပါ
-let isOld = true;
-if (cache) {
-    // DB ထဲမှာ သိမ်းတဲ့ field နာမည်က lastUpdated ဖြစ်နေတတ်လို့ နှစ်မျိုးလုံးစစ်ပါ
-    const lastUpdateTime = cache.lastUpdated || cache.updatedAt; 
-    
-    if (lastUpdateTime) {
-        const diffMs = Date.now() - new Date(lastUpdateTime).getTime();
-        const diffMins = diffMs / (1000 * 60);
-        
-        // ၃ မိနစ် မကျော်သေးရင် isOld ကို false ပေးလိုက်ပါ
-        if (diffMins < 3) {
-            isOld = false;
+        // ၂။ အချိန်စစ်မယ်
+        let isOld = true;
+        if (cache) {
+            const lastUpdateTime = cache.lastUpdated || cache.updatedAt; 
+            if (lastUpdateTime) {
+                const diffMins = (Date.now() - new Date(lastUpdateTime).getTime()) / (1000 * 60);
+                if (diffMins < 3) isOld = false;
+            }
         }
-    }
-}
 
-// ၃။ isOld က true (ဟောင်းနေမှ) သာလျှင် API ခေါ်မယ်
-if (!cache || isOld) {
-    console.log(`📡 [API Call] Data is ${!cache ? 'missing' : 'stale'}. Syncing...`);
-    await syncAndNotify(m.fixtureId);
-    // ... ကျန်တဲ့ code များ
-} else {
-    console.log(`✅ [Cache Hit] Using existing data for ${m.home}.`);
-}
+        // ၃။ Logic အရ API ခေါ်သင့်ရင် ခေါ်မယ်
+        if (!cache || isOld) {
+            console.log(`📡 [API Call] Syncing for ${m.home}...`);
+            await syncAndNotify(m.fixtureId);
 
-        // ရလဒ် ထုတ်ပြခြင်း
-        // cache ပြန်ရှာလို့မှ မတွေ့သေးရင် default တန်ဖိုးတွေပေးထားမယ်
-        const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0`";
+            // *** အရေးကြီးဆုံးအပိုင်း ***
+            // API က သိမ်းတာ စက္ကန့်ပိုင်းကြာနိုင်လို့ ခဏစောင့်ပြီး cache ကို ပြန်ရှာရမယ်
+            await new Promise(r => setTimeout(r, 2000)); 
+            cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+        } else {
+            console.log(`✅ [Cache Hit] Data is fresh for ${m.home}.`);
+        }
+
+        // ၄။ ရလဒ် ထုတ်ပြခြင်း (Final Display)
+        // sync လုပ်ပြီးလို့မှ cache မရှိသေးရင် Default 0-0 ပြမယ်
+        const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0` (Updating)";
         let statusDisplay = cache ? `ပွဲကစားနေသည် (${cache.elapsed}')` : "ပွဲစတင်နေပါပြီ";
         
         if (cache && ['FT', 'AET', 'PEN'].includes(cache.status)) {
@@ -193,7 +179,6 @@ if (!cache || isOld) {
         return ctx.reply("⚠️ အချက်အလက်ရယူရာတွင် အမှားအယွင်းရှိနေပါသည်။");
     }
 }
-
 
 // --- ၃။ Bot Commands ---
 bot.command("start", async (ctx) => {
