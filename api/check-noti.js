@@ -46,9 +46,9 @@ const processAndNotify = async (fixtures) => {
 
      // targetedUsers ထဲမှာ DB ကလာတဲ့ user list ရှိတယ်
 const mentionText = targetedUsers.map(u => {
-    // Markdown format: [Display Name](tg://user?id=USER_ID)
-    const displayName = u.name || u.username || 'User';
-    return `[${displayName}](tg://user?id=${u.userId})`;
+    // နာမည်ထဲမှာ Markdown character တွေပါရင် ပျက်မသွားအောင် escape လုပ်မယ်
+    const safeName = escapeMarkdown(u.name || u.username || 'User');
+    return `[${safeName}](tg://user?id=${u.userId})`;
 }).join(' ');
 
 // Mention Prefix ကို စာသားသစ်နဲ့ တွဲမယ်
