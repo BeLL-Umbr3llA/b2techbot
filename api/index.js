@@ -120,16 +120,14 @@ async function sendMatchDetail(ctx, m) {
 
         // --- အခြေအနေ (၁) - ပွဲမစသေးလျှင် ---
         if (now < matchTime) {
-            // Funny Message ကို ယူမယ်
             const funnyMsg = getFunnyWaitingMsg();
-            
-         const msg = 
-                    `⚽️ *ပွဲစဉ်အသေးစိတ်*\n\n` +
-                    `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
-                    `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
-                    `📅 *${toMMT(m.utcDate)}*\n\n` +
-                    `💬 ${escapeMarkdown(funnyMsg)}\n` + // ဒီနေရာမှာ funnyMsg ကို Markdown အပိတ် * ထည့်လိုက်ပါပြီ
-                    `🕒 *အခြေအနေ:* ပွဲမစသေးပါ`;
+            const msg = 
+                `⚽️ *ပွဲစဉ်အသေးစိတ်*\n\n` +
+                `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
+                `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
+                `📅 *${toMMT(m.utcDate)}*\n\n` +
+                `💬 ${escapeMarkdown(funnyMsg)}\n` +
+                `🕒 *အခြေအနေ:* ပွဲမစသေးပါ`;
             
             return ctx.reply(msg, { 
                 parse_mode: "Markdown", 
@@ -139,34 +137,32 @@ async function sendMatchDetail(ctx, m) {
         }
 
         // --- အခြေအနေ (၂) - ပွဲစနေပြီဆိုလျှင် Live Cache မှာအရင်ရှာ ---
-     
+        // cache ကို let နဲ့ ကြေညာပေးရပါမယ် (ဒါမှ အောက်မှာ တန်ဖိုးပြန်ထည့်လို့ရမှာပါ)
         let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
 
         // cache ရှိမှသာ အချိန်ကို တွက်ချက်မယ်
-        let isOld = true; // cache မရှိရင် logic အလုပ်လုပ်အောင် default true ထားနိုင်တယ်
-        if (cache && cache.updatedAt) {
-            const cacheTime = new Date(cache.updatedAt).getTime();
+        let isOld = true; 
+        if (cache && (cache.updatedAt || cache.lastUpdated)) {
+            // သင့် DB schema အရ updatedAt သို့မဟုတ် lastUpdated ကို သုံးပါ
+            const lastTime = new Date(cache.updatedAt || cache.lastUpdated).getTime();
             const currentTime = Date.now();
-            const diffMinutes = (currentTime - cacheTime) / (1000 * 60);
+            const diffMinutes = (currentTime - lastTime) / (1000 * 60);
             isOld = diffMinutes > 3;
         }
 
         // --- အခြေအနေ (၃) - Cache မရှိလျှင် သို့မဟုတ် ဒေတာဟောင်းနေလျှင် API Call & Sync ---
         if (!cache || isOld) {
-            console.log(`🔄 Cache is ${!cache ? 'missing' : 'stale'}. Syncing...`);
+            console.log(`🔄 Cache is ${!cache ? 'missing' : 'stale'}. Syncing for ${m.home}...`);
             await syncAndNotify(m.fixtureId);
 
-            // API ပို့ပြီး Noti API က DB ထဲသိမ်းချိန်ကို ခဏစောင့်ပေးမယ် (2 sec)
+            // API ဘက်က DB ထဲသိမ်းချိန်ကို ခဏစောင့်ပေးမယ်
             await new Promise(r => setTimeout(r, 2000)); 
             cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-            
-            if (cache) {
-                console.log("✅ New Cache Data Found:", cache.score);
-            }
         }
 
-        // ရလဒ် ထုတ်ပြခြင်း (Live ပွဲများအတွက်)
-        let scoreDisplay = cache ? `\`${cache.score}\`` : "0-0";
+        // ရလဒ် ထုတ်ပြခြင်း
+        // cache ပြန်ရှာလို့မှ မတွေ့သေးရင် default တန်ဖိုးတွေပေးထားမယ်
+        const scoreDisplay = cache ? `\`${cache.score}\`` : "`0-0`";
         let statusDisplay = cache ? `ပွဲကစားနေသည် (${cache.elapsed}')` : "ပွဲစတင်နေပါပြီ";
         
         if (cache && ['FT', 'AET', 'PEN'].includes(cache.status)) {
@@ -180,14 +176,15 @@ async function sendMatchDetail(ctx, m) {
             `🔢 ရလဒ်: ${scoreDisplay}\n` +
             `🕒 အခြေအနေ: *${statusDisplay}*`;
 
-         return ctx.reply(msg, { 
-                parse_mode: "Markdown", 
-                reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
-                message_thread_id: TARGET_TOPIC_ID 
-            });
+        return ctx.reply(msg, { 
+            parse_mode: "Markdown", 
+            reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
+            message_thread_id: TARGET_TOPIC_ID 
+        });
 
     } catch (err) {
-        console.error("❌ Search Response Error:", err);
+        console.error("❌ Search Response Error:", err.message);
+        return ctx.reply("⚠️ အချက်အလက်ရယူရာတွင် အမှားအယွင်းရှိနေပါသည်။");
     }
 }
 
