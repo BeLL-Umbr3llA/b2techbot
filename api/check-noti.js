@@ -7,7 +7,6 @@ const APISPORTS_KEY = process.env.APISPORTS_KEY;
 const GROUP_ID = process.env.GROUP_ID || -1003726917388;
 const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID || 2;
 const TOP_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
-
 const processAndNotify = async (fixtures) => {
     await connectDB();
     const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
@@ -16,15 +15,34 @@ const processAndNotify = async (fixtures) => {
 
     for (const m of fixtures) {
         const fid = m.fixture.id;
-        const lid = m.league.id;
         const currentScore = `${m.goals.home}-${m.goals.away}`;
         const matchStatus = m.fixture.status.short; 
         const elapsed = m.fixture.status.elapsed || 0;
 
+        // ဒီပွဲကို Sub လုပ်ထားတဲ့ User တွေကိုပဲ စစ်မယ်
         const targetedUsers = usersWithSubs.filter(u => u.subscriptions.some(s => s.fixtureId === fid));
-        const isTopLeague = TOP_LEAGUES.includes(lid);
 
-        if (targetedUsers.length === 0 && !isTopLeague) continue;
+        // အရေးကြီးဆုံးအချက်- Sub လုပ်ထားတဲ့သူ မရှိရင် ဘာ Noti မှ မပို့ဘဲ ကျော်သွားမယ်
+        if (targetedUsers.length === 0) {
+            // Cache Update တော့ လုပ်ချင်ရင် လုပ်နိုင်ပါတယ်၊ ဒါပေမဲ့ Noti အပိုင်းကို ကျော်ဖို့ ဒီမှာ continue သုံးရမယ်
+            // Cache ကိုပါ Update မလုပ်ချင်ရင် အောက်က update code ကိုပါ ကျော်ဖို့ ဒီနေရာမှာပဲ continue လုပ်ပါ
+            
+            // --- Cache Update Only (Optional) ---
+            await LiveCache.findOneAndUpdate(
+                { fixtureId: fid },
+                {
+                    home: m.teams.home.name,
+                    away: m.teams.away.name,
+                    score: currentScore,
+                    elapsed: elapsed,
+                    status: matchStatus,
+                    lastUpdated: new Date()
+                },
+                { upsert: true }
+            );
+             console.log("✅ Update process finished.");
+            continue; 
+        }
 
         const mentionText = targetedUsers.map(u => `[${u.name || 'User'}](tg://user?id=${u.userId})`).join(' ');
         const mentionPrefix = mentionText ? `\n\n🔔 Notifications for: ${mentionText}` : "";
@@ -69,7 +87,7 @@ const processAndNotify = async (fixtures) => {
             }
         }
 
-        // (C) Live Cache Update
+        // (C) Live Cache Update (Sub လုပ်ထားသူ ရှိတဲ့ပွဲများအတွက်)
         await LiveCache.findOneAndUpdate(
             { fixtureId: fid },
             {
