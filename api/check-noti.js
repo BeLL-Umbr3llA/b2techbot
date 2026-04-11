@@ -4,8 +4,8 @@ const { connectDB, User, LiveCache, Match } = require("../db");
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
-const GROUP_ID = process.env.GROUP_ID;
-const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID;
+const GROUP_ID = process.env.GROUP_ID || -1003726917388;
+const TARGET_TOPIC_ID = process.env.TARGET_TOPIC_ID || 2;
 const TOP_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
 
 // --- အဓိက Notification စစ်ဆေးပြီး Cache Update လုပ်မယ့် Function ---
