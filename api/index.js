@@ -158,11 +158,11 @@ async function sendMatchDetail(ctx, m) {
             `🔢 ရလဒ်: ${scoreDisplay}\n` +
             `🕒 အခြေအနေ: *${statusDisplay}*`;
 
-        await ctx.reply(msg, { 
-            parse_mode: "Markdown", 
-            reply_markup: new InlineKeyboard().text("🔄 Update ပြန်ကြည့်ရန်", `sh_${m.fixtureId}`),
-            message_thread_id: TARGET_TOPIC_ID 
-        });
+         return ctx.reply(msg, { 
+                parse_mode: "Markdown", 
+                reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
+                message_thread_id: TARGET_TOPIC_ID 
+            });
 
     } catch (err) {
         console.error("❌ Search Response Error:", err);
