@@ -43,7 +43,10 @@ const checkNoti = async () => {
 
     // Noti ဖွင့်ထားသူလည်းမရှိ၊ Top League လည်းမဟုတ်ရင် ကျော်သွားမယ်
     if (targetedUsers.length === 0 && !isTopLeague) continue;
-
+        
+    const mentionText = targetedUsers.map(u => `[${u.name || 'User'}](tg://user?id=${u.userId})`).join(' ');
+    const mentionPrefix = mentionText ? `\n\n🔔 Notifications for: ${mentionText}` : "";
+        
     // --- Database ထဲမှာ အခြေအနေဟောင်းကို ရှာမယ် ---
     const oldLive = await LiveCache.findOne({ fixtureId: fid });
 
@@ -52,7 +55,7 @@ const checkNoti = async () => {
     if (!oldLive) {
         const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n` +
                            `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
-                           `🏆 ${m.league.name}`;
+                           `🏆 ${m.league.name}\n`+'${mentionPrefix}';
 
         // Group ထဲက Topic ဆီသို့ ပို့မယ်
         await bot.api.sendMessage(GROUP_ID, kickOffMsg, { 
@@ -77,7 +80,7 @@ const checkNoti = async () => {
                     const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n` +
                                    `🥅 *${m.teams.home.name}* ${currentScore}  *${m.teams.away.name}*\n\n` +
                                    `👤 Scorer: *${lastGoal?.player?.name || "N/A"}*\n` +
-                                   `🕒 Time: ${m.fixture.status.elapsed}' (Minute)`;
+                                   `🕒 Time: ${m.fixture.status.elapsed}' (Minute)\n`+'${mentionPrefix}`;
 
                     // Logo ပုံကို အရင်ပို့ပြီး စာသားကို Caption မှာ ထည့်မယ်
                     
