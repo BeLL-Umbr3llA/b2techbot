@@ -6,13 +6,11 @@ const connectDB = async () => {
 
     try {
         await mongoose.connect(process.env.MONGO_URI);
-        // Local မှာ run နေစဉ်အတွင်းပဲ ဒီစာသားကို ပြချင်ရင် အောက်ကလို စစ်လို့ရပါတယ်
         if (process.env.NODE_ENV !== 'production') {
             console.log("✅ MongoDB Connected Successfully!");
         }
     } catch (err) {
         console.error("❌ MongoDB Connection Error:", err.message);
-        // Database မချိတ်ဘဲ ရှေ့ဆက်ရင် error တက်မှာမို့လို့ process ကို ရပ်လိုက်မယ်
         if (process.env.NODE_ENV !== 'production') {
             process.exit(1);
         }
@@ -35,34 +33,41 @@ const matchSchema = new mongoose.Schema({
     lastUpdated: { type: Date, default: Date.now }
 });
 
-const LiveCacheSchema = new mongoose.Schema({
+const liveCacheSchema = new mongoose.Schema({ // Variable name ကို တစ်သမတ်တည်းဖြစ်အောင် အသေးပြောင်းထားတယ်
     type: { type: String, default: "match_data" }, 
     fixtureId: { type: Number },
     home: String,
     away: String,
     score: String,
     elapsed: Number,
-    status: String, // ဤနေရာတွင် HT, FT, 1H, 2H စသည်တို့ သိမ်းမည်
+    status: String, // HT, FT, 1H, 2H စသည်တို့
     lastUpdated: { type: Date, default: Date.now }
 }, { strict: false, timestamps: true });
 
-
 const userSchema = new mongoose.Schema({
     userId: Number,
+    name: String, // အရင် code မှာ u.name လို့ သုံးထားတာရှိလို့ name ထည့်ပေးထားတယ်
     username: String,
-    subscriptions: [{ fixtureId: Number, home: String, away: String, isStartedNotified: Boolean }]
+    subscriptions: [{ 
+        fixtureId: Number, 
+        home: String, 
+        away: String, 
+        isStartedNotified: { type: Boolean, default: false } 
+    }]
 });
 
 const apiLogSchema = new mongoose.Schema({
-    date: { type: String, unique: true }, // ဥပမာ - "2024-04-10"
+    date: { type: String, unique: true }, // "2024-04-10"
     count: { type: Number, default: 0 }
 });
 
-const ApiLog = mongoose.model("ApiLog", apiLogSchema);
+// --- Models များကို Create လုပ်ခြင်း (သို့မဟုတ်) Existing model ကို ယူခြင်း ---
+// OverwriteModelError ကို ကာကွယ်ရန် mongoose.models ကို အရင်စစ်ရပါမယ်
 
-// Models များကို Create လုပ်ခြင်း (သို့မဟုတ်) Existing model ကို ယူခြင်း
 const Match = mongoose.models.Match || mongoose.model("Match", matchSchema);
 const LiveCache = mongoose.models.LiveCache || mongoose.model("LiveCache", liveCacheSchema);
 const User = mongoose.models.User || mongoose.model("User", userSchema);
+const ApiLog = mongoose.models.ApiLog || mongoose.model("ApiLog", apiLogSchema);
 
-module.exports = { connectDB, Match, LiveCache, User };
+// Module Exports မှာ အကုန်လုံး ပါဝင်ကြောင်း သေချာစေရမယ်
+module.exports = { connectDB, Match, LiveCache, User, ApiLog };
