@@ -59,83 +59,116 @@ const escapeMarkdown = (text) => {
     return text.replace(/[_*`[\]]/g, '\\$&');
 };
 
-async function fetchLiveFromAPI(fixtureId) {
+async function syncAndNotify(targetFixtureId) {
     try {
+        // Top Leagues: PL, La Liga, Serie A, Bundesliga, Ligue 1, UCL, Myanmar League
+        const topLeagues = [39, 140, 135, 78, 61, 2, 466]; 
+        
         const options = {
             method: 'GET',
             url: 'https://v3.football.api-sports.io/fixtures',
-            params: { id: fixtureId },
+            params: { live: 'all', league: topLeagues.join('-') },
             headers: {
                 'x-rapidapi-key': process.env.APISPORTS_KEY,
                 'x-rapidapi-host': 'v3.football.api-sports.io'
             }
         };
+
         const response = await axios.request(options);
-        const data = response.data.response[0];
-        
-        if (data) {
-            return {
-                score: `${data.goals.home}-${data.goals.away}`,
-                elapsed: data.fixture.status.elapsed,
-                status: data.fixture.status.short
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error("❌ API Fetch Error:", error);
-        return null;
-    }
-}
+        let liveFixtures = response.data.response;
 
-// --- ၂။ Match Detail (Clean Layout) ---
-async function sendMatchDetail(ctx, m) {
-    try {
-        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
-        let liveInfo = cache ? { score: cache.score, elapsed: cache.elapsed } : null;
-
-        const now = new Date();
-        const matchTime = new Date(m.utcDate);
-        
-        if (!liveInfo && now >= matchTime) {
-            const today = new Date().toISOString().split('T')[0];
-            const apiData = await fetchLiveFromAPI(m.fixtureId);
-
-            if (apiData && apiData.status !== 'NS') {
-                liveInfo = apiData;
-                try {
-                    await ApiLog.updateOne(
-                        { date: today },
-                        { $inc: { count: 1 } },
-                        { upsert: true }
-                    );
-                } catch (logErr) {
-                    console.error("❌ Log Error:", logErr);
-                }
+        // User ရှာတဲ့ပွဲက Top League ထဲမပါရင် အဲ့တစ်ပွဲတည်း သီးသန့်ထပ်ဆွဲမယ်
+        const isTargetFound = liveFixtures.some(f => f.fixture.id === Number(targetFixtureId));
+        if (!isTargetFound) {
+            const singleMatch = await axios.get('https://v3.football.api-sports.io/fixtures', {
+                params: { id: targetFixtureId },
+                headers: options.headers
+            });
+            if (singleMatch.data.response[0]) {
+                liveFixtures.push(singleMatch.data.response[0]);
             }
         }
+    
+        // --- Notification API ဆီ ဒေတာပို့ခြင်း ---
+        // ဤနေရာတွင် check-noti.js သည် ဒေတာလက်ခံပြီး Noti ပို့ခြင်းနှင့် LiveCache Update လုပ်ခြင်းကို တာဝန်ယူရမည်
+        if (liveFixtures.length > 0) {
+            await axios.post(`${process.env.INTERNAL_API_URL}/api/check-noti`, {
+                fixtures: liveFixtures
+            }).catch(err => console.error("❌ Noti API Forward Error:", err.message));
+        }
 
-        let statusText = liveInfo ? `ပွဲကစားနေသည် (${liveInfo.elapsed}')` : "ပွဲမစသေးပါ";
-        let scoreText = liveInfo ? `\`${liveInfo.score}\`` : getFunnyWaitingMsg();
-
-        const msg = 
-            `⚽️ *ပွဲစဉ်အသေးစိတ်*\n\n` +
-            `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
-            `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
-            `📅 *${toMMT(m.utcDate)}*\n` +
-            `🔢 ${scoreText}\n` +
-            `🕒 *အခြေအနေ:* ${statusText}`;
-
-        const kb = new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`);
+        return liveFixtures;
         
-        await ctx.reply(msg, { 
-            parse_mode: "Markdown", 
-            reply_markup: kb,
-            message_thread_id: TARGET_TOPIC_ID // စာပြန်ရင် Topic ထဲမှာပဲပြန်မယ်
-        });
-    } catch (err) {
-        console.error("❌ Detail Error:", err);
+    } catch (error) {
+        console.error("❌ Sync Logic Error:", error);
+        return [];
     }
 }
+
+async function sendMatchDetail(ctx, m) {
+    try {
+        const now = new Date();
+        const matchTime = new Date(m.utcDate);
+
+        // --- အခြေအနေ (၁) - ပွဲမစသေးလျှင် ---
+        if (now < matchTime) {
+            // Funny Message ကို ယူမယ်
+            const funnyMsg = getFunnyWaitingMsg();
+            
+         const msg = 
+                    `⚽️ *ပွဲစဉ်အသေးစိတ်*\n\n` +
+                    `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
+                    `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
+                    `📅 *${toMMT(m.utcDate)}*\n\n` +
+                    `💬 ${escapeMarkdown(funnyMsg)}\n` + // ဒီနေရာမှာ funnyMsg ကို Markdown အပိတ် * ထည့်လိုက်ပါပြီ
+                    `🕒 *အခြေအနေ:* ပွဲမစသေးပါ`;
+            
+            return ctx.reply(msg, { 
+                parse_mode: "Markdown", 
+                reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
+                message_thread_id: TARGET_TOPIC_ID 
+            });
+        }
+
+        // --- အခြေအနေ (၂) - ပွဲစနေပြီဆိုလျှင် Live Cache မှာအရင်ရှာ ---
+        let cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+        const isOld = cache && (Date.now() - new Date(cache.updatedAt).getTime() > 3 * 60 * 1000);
+
+        // --- အခြေအနေ (၃) - Cache မရှိလျှင် သို့မဟုတ် ဒေတာဟောင်းနေလျှင် API Call & Sync ---
+        if (!cache || isOld) {
+            await syncAndNotify(m.fixtureId);
+            
+            // API ပို့ပြီး Noti API က DB ထဲသိမ်းချိန်ကို ခဏစောင့်ပေးမယ် (1.5 sec)
+            await new Promise(r => setTimeout(r, 1500));
+            cache = await LiveCache.findOne({ fixtureId: Number(m.fixtureId) });
+        }
+
+        // ရလဒ် ထုတ်ပြခြင်း (Live ပွဲများအတွက်)
+        let scoreDisplay = cache ? `\`${cache.score}\`` : "0-0";
+        let statusDisplay = cache ? `ပွဲကစားနေသည် (${cache.elapsed}')` : "ပွဲစတင်နေပါပြီ";
+        
+        if (cache && ['FT', 'AET', 'PEN'].includes(cache.status)) {
+            statusDisplay = "ပွဲပြီးဆုံးသွားပါပြီ (Full Time)";
+        }
+
+        const msg = 
+            `⚽️ *ပွဲစဉ်အသေးစိတ် (Live)*\n\n` +
+            `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
+            `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
+            `🔢 ရလဒ်: ${scoreDisplay}\n` +
+            `🕒 အခြေအနေ: *${statusDisplay}*`;
+
+        await ctx.reply(msg, { 
+            parse_mode: "Markdown", 
+            reply_markup: new InlineKeyboard().text("🔄 Update ပြန်ကြည့်ရန်", `sh_${m.fixtureId}`),
+            message_thread_id: TARGET_TOPIC_ID 
+        });
+
+    } catch (err) {
+        console.error("❌ Search Response Error:", err);
+    }
+}
+
 
 // --- ၃။ Bot Commands ---
 bot.command("start", async (ctx) => {
