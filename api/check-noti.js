@@ -12,14 +12,13 @@ const processAndNotify = async (fixtures) => {
     await connectDB();
     const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
     
-    // index.js မှ data ရောက်မရောက် စစ်ဆေးရန်
-    console.log(`📥Youk dl Processing ${fixtures.length} fixtures from POST request...`);
+    console.log(`📥 Processing ${fixtures.length} fixtures...`);
 
     for (const m of fixtures) {
         const fid = m.fixture.id;
         const lid = m.league.id;
         const currentScore = `${m.goals.home}-${m.goals.away}`;
-        const matchStatus = m.fixture.status.short; // ဥပမာ- 1H, 2H, HT
+        const matchStatus = m.fixture.status.short; 
         const elapsed = m.fixture.status.elapsed || 0;
 
         const targetedUsers = usersWithSubs.filter(u => u.subscriptions.some(s => s.fixtureId === fid));
@@ -35,7 +34,6 @@ const processAndNotify = async (fixtures) => {
         // (A) Kick Off Notification
         if ((!oldLive || oldLive.status === 'NS') && matchStatus === '1H') {
             const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n🏆 ${m.league.name}${mentionPrefix}`;
-            
             await bot.api.sendMessage(GROUP_ID, kickOffMsg, { 
                 parse_mode: "Markdown", 
                 message_thread_id: TARGET_TOPIC_ID 
@@ -47,23 +45,14 @@ const processAndNotify = async (fixtures) => {
             const [oldHome, oldAway] = oldLive.score.split('-').map(Number);
             const [curHome, curAway] = currentScore.split('-').map(Number);
             
-            let scoringTeamName = "";
-            let scoringTeamLogo = "";
-
-            if (curHome > oldHome) {
-                scoringTeamName = m.teams.home.name;
-                scoringTeamLogo = m.teams.home.logo;
-            } else if (curAway > oldAway) {
-                scoringTeamName = m.teams.away.name;
-                scoringTeamLogo = m.teams.away.logo;
-            }
+            let scoringTeamName = (curHome > oldHome) ? m.teams.home.name : m.teams.away.name;
+            let scoringTeamLogo = (curHome > oldHome) ? m.teams.home.logo : m.teams.away.logo;
 
             const lastGoalEvent = (m.events && Array.isArray(m.events)) 
                                   ? m.events.filter(e => e.type === "Goal").pop() 
                                   : null;
             const scorerName = lastGoalEvent?.player?.name || "ဂိုးဝင်သွားသည်";
 
-            // undefined မဖြစ်အောင် matchStatus ကို သေချာသုံးထားပါတယ်
             const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n🥅 *${m.teams.home.name}* ${currentScore} *${m.teams.away.name}*\n🚩 Scoring Team: *${scoringTeamName}*\n👤 Scorer: *${scorerName}*\n🕒 Time: ${matchStatus} (${elapsed}')${mentionPrefix}`;
 
             try {
@@ -102,24 +91,25 @@ module.exports = async (req, res) => {
         await connectDB();
 
         if (req.method === 'POST') {
-             console.log("working POST");
+            console.log("🚀 Incoming POST Request");
             const { fixtures } = req.body;
+            
             if (fixtures && Array.isArray(fixtures)) {
-                // Background မှာ run မယ်၊ response ကို ချက်ချင်းပြန်မယ်
-                processAndNotify(fixtures).catch(e => console.error("Async Process Error:", e.message));
-                return res.status(200).json({ success: true, message: `Received ${fixtures.length} matches` });
+                // Background ထက်စာရင် await သုံးပြီး log ကို အရင်စစ်ကြည့်ပါ (Debug အတွက်)
+                await processAndNotify(fixtures); 
+                return res.status(200).json({ success: true, count: fixtures.length });
             }
             return res.status(400).send("Invalid fixtures data.");
         }
         
         if (req.method === 'GET') {
-               console.log("working Get");
+            console.log("🚀 Incoming GET (Cron) Request");
             const now = new Date();
             const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
             
             if (usersWithSubs.length === 0) {
+                console.log("⚠️ No subscriptions found.");
                 return res.status(200).send("Cron: No subscriptions found.");
-                   console.log("User ma shi pr");
             }
 
             const subFixtureIds = [...new Set(usersWithSubs.flatMap(u => u.subscriptions.map(s => s.fixtureId)))];
@@ -129,13 +119,15 @@ module.exports = async (req, res) => {
             });
 
             if (activeMatches.length === 0) {
+                console.log("⚠️ No active subbed matches found.");
                 return res.status(200).send("Cron: No active subbed matches.");
-                   console.log("ပွဲမစသေးပါ");
             }
-            console.log("api ခေါ်ပါပြီ");
-            const resData = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
+
+            console.log("📡 Fetching from API Sports...");
+            const apiRes = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
                 headers: { 'x-apisports-key': APISPORTS_KEY }
-            }).then(r => r.json());
+            });
+            const resData = await apiRes.json();
 
             if (resData.response && resData.response.length > 0) {
                 await LiveCache.findOneAndUpdate(
@@ -143,14 +135,14 @@ module.exports = async (req, res) => {
                     { lastUpdated: now },
                     { upsert: true }
                 );
-                 console.log("Global sync ပြီးပီ");
+                console.log("⏰ Global timer updated.");
                 await processAndNotify(resData.response);
                 return res.status(200).send("Cron sync completed.");
             }
             return res.status(200).send("No live data from API.");
         }
     } catch (err) {
-        console.error(err);
+        console.error("❌ Error:", err.message);
         res.status(500).send(err.message);
     }
 };
