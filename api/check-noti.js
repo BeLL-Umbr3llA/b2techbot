@@ -55,7 +55,7 @@ const checkNoti = async () => {
     if (!oldLive) {
         const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n` +
                            `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
-                           `🏆 ${m.league.name}\n`+'${mentionPrefix}';
+                           `🏆 ${m.league.name}${mentionPrefix}';
 
         // Group ထဲက Topic ဆီသို့ ပို့မယ်
         await bot.api.sendMessage(GROUP_ID, kickOffMsg, { 
@@ -80,7 +80,7 @@ const checkNoti = async () => {
                     const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n` +
                                    `🥅 *${m.teams.home.name}* ${currentScore}  *${m.teams.away.name}*\n\n` +
                                    `👤 Scorer: *${lastGoal?.player?.name || "N/A"}*\n` +
-                                   `🕒 Time: ${m.fixture.status.elapsed}' (Minute)\n`+'${mentionPrefix}`;
+                                   `🕒 Time: ${m.fixture.status.elapsed} (Minute)${mentionPrefix}`;
 
                     // Logo ပုံကို အရင်ပို့ပြီး စာသားကို Caption မှာ ထည့်မယ်
                     
