@@ -6,17 +6,29 @@ const axios = require('axios');
 const bot = new Bot(process.env.BOT_TOKEN);
 
 // --- ၀။ Topic Configuration ---
-// သင်အသုံးပြုလိုသော Topic ID ကို ဒီမှာ ထည့်ပေးပါ (ဥပမာ: ၂)
-const TARGET_TOPIC_ID = 2; 
+// ၁။ Group ID နဲ့ ခွင့်ပြုမည့် Topic ID ကို ဒီမှာ အရင်သတ်မှတ်ပါ
+const GROUP_TOPIC_CONFIG = {
+    "-1003726917388": 2,  // Group ID : Topic ID
+    "-1003568582955": 2,  // နောက် Group တစ်ခု ID : Topic ID
+};
 
-// Middleware: သတ်မှတ်ထားတဲ့ Topic ID ကလွဲရင် ကျန်တာ အကုန် Block မယ်
+// ၂။ အောက်ပါ Middleware ကို bot commands တွေရဲ့ အပေါ်ဆုံးမှာ ထည့်ပါ
 bot.use(async (ctx, next) => {
+    // Private Chat (Bot ကို တစ်ယောက်တည်းလာမေးတာ) ဆိုရင် ပေးသုံးမယ်
+    if (ctx.chat?.type === 'private') return next();
+
+    const chatId = String(ctx.chat?.id);
     const messageThreadId = ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
-    
-    if (messageThreadId === TARGET_TOPIC_ID) {
-        return next();
+
+    // Config ထဲမှာ ဒီ Group ရှိမရှိ စစ်မယ်
+    if (GROUP_TOPIC_CONFIG[chatId]) {
+        // Group ရှိရင် သတ်မှတ်ထားတဲ့ Topic ID နဲ့ တူမှ ပေးသုံးမယ်
+        if (GROUP_TOPIC_CONFIG[chatId] === messageThreadId) {
+            return next();
+        }
     }
-    // Topic ID မတူရင် ဘာမှပြန်မလုပ်ဘူး
+    
+    // Config ထဲမှာ မပါတဲ့ Group သို့မဟုတ် Topic ID မတူရင် ဘာမှပြန်မလုပ်ဘူး (Ignore)
     return;
 });
 
@@ -131,7 +143,7 @@ async function sendMatchDetail(ctx, m) {
     try {
         const now = new Date();
         const matchTime = new Date(m.utcDate);
-
+        const threadId = ctx.currentTopicId || ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
         // --- အခြေအနေ (၁) - ပွဲမစသေးလျှင် ---
         if (now < matchTime) {
             const funnyMsg = getFunnyWaitingMsg();
@@ -146,7 +158,7 @@ async function sendMatchDetail(ctx, m) {
             return ctx.reply(msg, { 
                 parse_mode: "Markdown", 
                 reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
-                message_thread_id: TARGET_TOPIC_ID 
+                message_thread_id: threadId
             });
         }
 
@@ -207,46 +219,41 @@ if (shouldFetch) {
         
         // Status အလိုက် စာသားပြောင်းလဲခြင်း
         let statusDisplay = "";
-        if (cache) {
+       if (cache) {
             switch (cache.status) {
-                case 'HT':
-                    statusDisplay = "🔴 *Half Time (ပိုင်းဝက်နားချိန်)*";
-                    break;
-                case 'FT':
-                    statusDisplay = "🏁 *ပွဲပြီးဆုံးသွားပါပြီ (Full Time)*";
-                    break;
+                case 'HT': statusDisplay = "🔴 *Half Time (ပထမပိုင်းနားချိန်ပါ ရင်ခုန်နေပီလား)*"; break;
+                case 'FT': statusDisplay = "🏁 *ပွဲပြီးဆုံးသွားပါပြီ (Full Time)*"; break;
                 case '1H':
-                case '2H':
-                    statusDisplay = `⚽ *ပွဲကစားနေသည် (${cache.elapsed}')*`;
-                    break;
-                default:
-                    statusDisplay = `🕒 *အခြေအနေ:* ${cache.status} (${cache.elapsed}')`;
+                case '2H': statusDisplay = `⚽ *ပွဲကစားနေသည် (${cache.elapsed}')*`; break;
+                default: statusDisplay = `🕒 *အခြေအနေ:* ${cache.status} (${cache.elapsed}')`;
             }
         } else {
             statusDisplay = "🕒 *အခြေအနေ:* ပွဲစတင်နေပါပြီ";
         }
-
+        
         const msg = 
             `⚽️ *ပွဲစဉ်အသေးစိတ် (Live)*\n\n` +
             `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
             `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
-            `🔢 ရလဒ်: ${scoreDisplay}\n` +
-            `🕒 အခြေအနေ: *${statusDisplay}*`;
+            `🔢 ရလဒ်: *${scoreDisplay}*\n\n` +
+            `🕒 အခြေအနေ: ${statusDisplay}`;
 
         return ctx.reply(msg, { 
             parse_mode: "Markdown", 
             reply_markup: new InlineKeyboard().text("🔔 Notification ယူမယ်", `sub_${m.fixtureId}`),
-            message_thread_id: TARGET_TOPIC_ID 
+            message_thread_id: threadId
         });
 
     } catch (err) {
         console.error("❌ Search Response Error:", err.message);
-        return ctx.reply("⚠️ အချက်အလက်ရယူရာတွင် အမှားအယွင်းရှိနေပါသည်။");
+      const ThreadId = ctx.currentTopicId || ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
+        return ctx.reply("⚠️ အချက်အလက်ရယူရာတွင် အမှားအယွင်းရှိနေပါသည်။", { message_thread_id: ThreadId });
     }
 }
 
 // --- ၃။ Bot Commands ---
 bot.command("start", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
     const welcome = 
         `━━━━━━━━━━━━━━━━━━\n` +
         `⚽ *B2TECH FOOTBALL SERVICE* ⚽️\n` +
@@ -261,15 +268,18 @@ bot.command("start", async (ctx) => {
         `_ဥပမာ - /man_u\n` +
         `━━━━━━━━━━━━━━━━━━`;
 
-    await ctx.reply(welcome, { parse_mode: "Markdown", message_thread_id: TARGET_TOPIC_ID });
+    await ctx.reply(welcome, { parse_mode: "Markdown", message_thread_id: threadId });
 });
 
 bot.command("match", async (ctx) => {
+    
+    const threadId = ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
     try {
         await connectDB();
         const matches = await Match.find().sort({ utcDate: 1 });
         const leagueMap = new Map();
-
+     
+        
         matches.forEach(m => {
             const lid = m.leagueId ? String(m.leagueId) : null;
             if (lid) {
@@ -280,7 +290,7 @@ bot.command("match", async (ctx) => {
             }
         });
 
-        if (leagueMap.size === 0) return ctx.reply("⚽️ ယနေ့အတွက် ပွဲစဉ်များ မရှိသေးပါ。", { message_thread_id: TARGET_TOPIC_ID });
+        if (leagueMap.size === 0) return ctx.reply("⚽️ ယနေ့အတွက် ပွဲစဉ်များ မရှိသေးပါ。", { message_thread_id: threadId });
 
         const kb = new InlineKeyboard();
         leagueMap.forEach((data, id) => {
@@ -290,15 +300,16 @@ bot.command("match", async (ctx) => {
         await ctx.reply("🏆 *League တစ်ခုကို ရွေးချယ်ပါ*", { 
             parse_mode: "Markdown", 
             reply_markup: kb,
-            message_thread_id: TARGET_TOPIC_ID 
+            message_thread_id: threadId 
         });
     } catch (err) { console.error("❌ Match Error:", err); }
 });
 
 bot.command("live", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
     try {
         await connectDB();
-
+       
         // ၁။ အရင်ဆုံး Top Leagues ထဲက Live ဖြစ်နေတဲ့ပွဲတွေကို အရင်ရှာမယ်
         // TOP_LEAGUES array ထဲမှာ ပါတဲ့ league ID တွေကို ဦးစားပေးမယ်
         const topLeaguesList = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
@@ -319,7 +330,7 @@ bot.command("live", async (ctx) => {
 
         if (liveMatches.length === 0) {
             return ctx.reply("⚽️ လောလောဆယ် Live ကစားနေသည့်ပွဲ မရှိပါ။", { 
-                message_thread_id: TARGET_TOPIC_ID 
+                message_thread_id: threadId 
             });
         }
 
@@ -336,12 +347,14 @@ bot.command("live", async (ctx) => {
         await ctx.reply(title, { 
             parse_mode: "Markdown", 
             reply_markup: kb,
-            message_thread_id: TARGET_TOPIC_ID 
+            message_thread_id: threadId 
         });
 
     } catch (err) { 
         console.error("❌ Live Error:", err); 
-        ctx.reply("⚠️ Live data ပြရာတွင် အမှားရှိနေပါသည်။");
+        ctx.reply("⚠️ Live data ပြရာတွင် အမှားရှိနေပါသည်။", { 
+            message_thread_id: threadId 
+        });
     }
 });
 
@@ -349,17 +362,17 @@ bot.command("live", async (ctx) => {
 bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
     await ctx.answerCallbackQuery().catch(() => {});
-
+   
     try {
         await connectDB();
-
         if (data.startsWith("lg_")) {
+             const threadId = ctx.callbackQuery?.message?.message_thread_id || ctx.message?.message_thread_id ;
             const lidRaw = data.split("_")[1];
             const matches = await Match.find({ 
                 $or: [{ leagueId: Number(lidRaw) }, { leagueId: String(lidRaw) }] 
-            }).sort({ utcDate: 1 });
+            }).sort({ utcDate: 1 }).limit(25);
             
-            if (matches.length === 0) return ctx.reply("⚠️ ပွဲစဉ်မရှိပါ။", { message_thread_id: TARGET_TOPIC_ID });
+            if (matches.length === 0) return ctx.reply("⚠️ ပွဲစဉ်မရှိပါ။", { message_thread_id: threadId });
 
             let header = `🏆 *${escapeMarkdown(leagueNames[lidRaw] || "ပွဲစဉ်များ")}*\n` +
                          `━━━━━━━━━━━━━━━\n\n`;
@@ -372,20 +385,33 @@ bot.on("callback_query:data", async (ctx) => {
                 matchLines += `📅 ${timeStr}\n${teamLine}\n👉 click >> ${detailLink}\n\n`;
             });
 
-            return ctx.reply(header + matchLines, { parse_mode: "Markdown", message_thread_id: TARGET_TOPIC_ID });
+            return ctx.reply(header + matchLines, { parse_mode: "Markdown", message_thread_id: threadId });
         }
 
         if (data.startsWith("sh_")) {
-            const fid = Number(data.split("_")[1]);
-            const m = await Match.findOne({ fixtureId: fid });
-            if (m) return sendMatchDetail(ctx, m);
-        }
-
-    if (data.startsWith("sub_")) {
+    // ၁။ Topic ID ကို အရင်ယူပါ
+    const threadId = ctx.callbackQuery?.message?.message_thread_id || ctx.message?.message_thread_id ;
+    
     const fid = Number(data.split("_")[1]);
     const m = await Match.findOne({ fixtureId: fid });
-    if (!m) return ctx.reply("❌ ပွဲစဉ်မတွေ့ပါ။");
 
+    if (m) {
+        // ၂။ sendMatchDetail function ထဲမှာ threadId ကို သုံးနိုင်အောင် ctx ထဲမှာ ခဏသိမ်းထားပေးလိုက်ပါ
+        ctx.currentTopicId = threadId; 
+        return sendMatchDetail(ctx, m);
+    } else {
+        return ctx.reply("❌ ပွဲစဉ်အသေးစိတ် ရှာမတွေ့ပါ။", { message_thread_id: threadId });
+    }
+}
+
+    if (data.startsWith("sub_")) {
+    const threadId = ctx.callbackQuery?.message?.message_thread_id || ctx.message?.message_thread_id ;
+    const fid = Number(data.split("_")[1]);
+    const m = await Match.findOne({ fixtureId: fid });
+        
+    if (!m) {
+        return ctx.reply("❌ ပွဲစဉ်မတွေ့ပါ။", { message_thread_id: threadId });
+    }
     // User ရဲ့ အမည်ကို ယူမယ် (FirstName သို့မဟုတ် Username)
     const fullName = ctx.from.first_name + (ctx.from.last_name ? " " + ctx.from.last_name : "");
     const tgUsername = ctx.from.username || fullName; // username မရှိရင် နာမည်ကို သုံးမယ်
@@ -402,22 +428,27 @@ bot.on("callback_query:data", async (ctx) => {
                     fixtureId: fid, 
                     home: m.home, 
                     away: m.away, 
-                    isStartedNotified: false 
+                    isStartedNotified: false,
+                    topicId: threadId
                 } 
             } 
         },
         { upsert: true }
     );
-    
-    return ctx.reply(`🔔 *${m.home}* ပွဲအတွက် Noti မှတ်သားပြီးပါပြီ။`, { parse_mode: "Markdown" });
+    return ctx.reply(`🔔 *${m.home}* ပွဲအတွက် Noti မှတ်သားပြီးပါပြီ။`, { 
+        parse_mode: "Markdown",
+        message_thread_id: threadId 
+    });
 }
     } catch (err) {
         console.error("❌ Callback Error:", err);
+        
     }
 }); 
 
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text.trim();
+    const threadId = ctx.message?.message_thread_id || ctx.callbackQuery?.message?.message_thread_id;
     if (!text.startsWith("/")) return;
     
     const commandWithoutUsername = text.split('@')[0]; 
@@ -437,9 +468,10 @@ bot.on("message:text", async (ctx) => {
         const result = fuse.search(query);
 
         if (result.length > 0) {
+            ctx.currentTopicId = threadId;
             await sendMatchDetail(ctx, result[0].item);
         } else {
-            await ctx.reply("🔍 ရှာဖွေမှုမတွေ့ပါ။ အသင်းနာမည် ပြန်စစ်ပေးပါဦး။", { message_thread_id: TARGET_TOPIC_ID });
+            await ctx.reply("🔍 ရှာဖွေမှုမတွေ့ပါ။ အသင်းနာမည် ပြန်စစ်ပေးပါဦး။", { message_thread_id: threadId });
         }
     } catch (err) { 
         console.error("❌ Search Error:", err); 
