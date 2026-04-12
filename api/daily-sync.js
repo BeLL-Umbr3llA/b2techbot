@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { connectDB, Match, LiveCache,ApiLog } = require("./db"); // Path မှန်အောင် ပြန်စစ်ပါ
+const { connectDB, Match, LiveCache,ApiLog } = require("../db"); // Path မှန်အောင် ပြန်စစ်ပါ
 
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
 const TARGET_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
