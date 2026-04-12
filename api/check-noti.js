@@ -271,14 +271,13 @@ module.exports = async (req, res) => {
                 headers: { 'x-apisports-key': APISPORTS_KEY }
             });
             const resData = await apiRes.json();
-
-            // API Log မှတ်မယ် (Cron GET လို့ မှတ်မယ်) API 2 ၁ခါသုံးပြီး
-            await ApiLog.findOneAndUpdate(
-                { date: today, endpoint: "API2" },
-                { $inc: { count: 1 } },
-                { upsert: true }
-            );
-
+            if (apiRes.ok) { // API ခေါ်တာ အောင်မြင်မှသာ မှတ်မယ်
+                await ApiLog.findOneAndUpdate(
+                      { date: today, endpoint: "API2" },
+                    { $inc: { count: 1 } },
+                    { upsert: true }
+                );
+                }
             if (resData.response && resData.response.length > 0) {
                 await LiveCache.findOneAndUpdate(
                     { type: "global_sync_timer" },
