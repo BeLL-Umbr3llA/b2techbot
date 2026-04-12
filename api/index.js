@@ -153,7 +153,7 @@ async function sendMatchDetail(ctx, m) {
                 `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
                 `📅 *${toMMT(m.utcDate)}*\n` +
                  `🕒 *အခြေအနေ:* ပွဲမစသေးပါ\n\n`+
-                `💬 ${escapeMarkdown(funnyMsg)}\n` +
+                `💬 ${escapeMarkdown(funnyMsg)}\n` 
                ;
             
             return ctx.reply(msg, { 
