@@ -211,7 +211,7 @@ if (oldLive && oldLive.score !== currentScore) {
 module.exports = async (req, res) => {
     try {
         await connectDB();
-
+        const today = new Date().toISOString().split('T')[0];
         if (req.method === 'POST') {
             console.log("🚀 Incoming POST Request");
 
