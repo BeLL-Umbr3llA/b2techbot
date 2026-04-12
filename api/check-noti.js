@@ -49,56 +49,147 @@ const processAndNotify = async (fixtures) => {
              console.log("✅ Update process finished.");
             continue; 
         }
+        
+const oldLive = await LiveCache.findOne({ fixtureId: fid });
 
-     // targetedUsers ထဲမှာ DB ကလာတဲ့ user list ရှိတယ်
-const mentionText = targetedUsers.map(u => {
-    // နာမည်ထဲမှာ Markdown character တွေပါရင် ပျက်မသွားအောင် escape လုပ်မယ်
-    const safeName = escapeMarkdown(u.name || u.username || 'User');
-    return `[${safeName}](tg://user?id=${u.userId})`;
-}).join(' ');
+// (A) Kick Off Notification
+if ((!oldLive || oldLive.status === 'NS') && matchStatus === '1H') {
+    // ၁။ ဒီပွဲကို Subscribe လုပ်ထားတဲ့ User အားလုံးကို ဆွဲထုတ်မယ်
+    const subscribers = await User.find({ "subscriptions.fixtureId": m.fixture.id });
 
-// Mention Prefix ကို စာသားသစ်နဲ့ တွဲမယ်
-const mentionPrefix = mentionText ? `\n\n🔔 ပွဲစဉ်စောင့်ကြည့်နေသူများ - ${mentionText}` : "";
+    // ဟာသ Quotes များ (ပို့တိုင်း တစ်မျိုးပြောင်းနေအောင်)
+    const funnyQuotes = [
+        "💸 မွဲမလား၊ ချမ်းသာမလား ရင်ခုန်လိုက်တော့! ",
+        "🧻 ရှုံးရင် ငိုဖို့ တစ်ရှူး အဆင်သင့်ရှိပါစေ! ",
+        "🥘 ဟင်းအိုးတူးနေရင် Bot တာဝန်မယူပါ! ",
+        "📢 နိုးကြဦး! ဖုန်းကြီးကိုင်ပြီး အိပ်ပျော်မနေနဲ့! "
+    ];
 
-        const oldLive = await LiveCache.findOne({ fixtureId: fid });
+    // ၂။ Group + Topic အလိုက် ခွဲခြားသိမ်းဆည်းမယ်
+    const groupMap = {};
 
-        // (A) Kick Off Notification
-        if ((!oldLive || oldLive.status === 'NS') && matchStatus === '1H') {
-            const kickOffMsg = `🎬 *Kick Off - ပွဲစပါပြီ!*\n\n🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n🏆 ${m.league.name}${mentionPrefix}`;
-            await bot.api.sendMessage(GROUP_ID, kickOffMsg, { 
-                parse_mode: "Markdown", 
-                message_thread_id: TARGET_TOPIC_ID 
-            }).catch(e => console.error("KickOff Send Error:", e.message));
-        }
+    subscribers.forEach(user => {
+        const sub = user.subscriptions.find(s => s.fixtureId === m.fixture.id);
+        
+        if (sub && sub.chatId) {
+            const key = `${sub.chatId}_${sub.topicId || 0}`;
 
-        // (B) Goal Notification
-        if (oldLive && oldLive.score !== currentScore) {
-            const [oldHome, oldAway] = oldLive.score.split('-').map(Number);
-            const [curHome, curAway] = currentScore.split('-').map(Number);
-            
-            let scoringTeamName = (curHome > oldHome) ? m.teams.home.name : m.teams.away.name;
-            let scoringTeamLogo = (curHome > oldHome) ? m.teams.home.logo : m.teams.away.logo;
-
-            const lastGoalEvent = (m.events && Array.isArray(m.events)) 
-                                  ? m.events.filter(e => e.type === "Goal").pop() 
-                                  : null;
-            const scorerName = lastGoalEvent?.player?.name || "ဂိုးဝင်သွားသည်";
-
-            const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n🥅 *${m.teams.home.name}* ${currentScore} *${m.teams.away.name}*\n🚩 Scoring Team: *${scoringTeamName}*\n👤 Scorer: *${scorerName}*\n🕒 Time: ${matchStatus} (${elapsed}')${mentionPrefix}`;
-
-            try {
-                await bot.api.sendPhoto(GROUP_ID, scoringTeamLogo || m.teams.home.logo, {
-                    caption: goalMsg,
-                    parse_mode: "Markdown",
-                    message_thread_id: TARGET_TOPIC_ID
-                });
-            } catch (e) {
-                await bot.api.sendMessage(GROUP_ID, goalMsg, { 
-                    parse_mode: "Markdown", 
-                    message_thread_id: TARGET_TOPIC_ID 
-                });
+            if (!groupMap[key]) {
+                groupMap[key] = {
+                    chatId: sub.chatId,
+                    topicId: sub.topicId,
+                    mentions: []
+                };
             }
+
+            // Markdown character တွေကို escape လုပ်ဖို့ မမေ့ပါနဲ့
+            const safeName = (user.name || 'User').replace(/[_*`[\]()]/g, '\\$&');
+            const mention = user.username 
+                ? `@${user.username}` 
+                : `[${safeName}](tg://user?id=${user.userId})`;
+            
+            groupMap[key].mentions.push(mention);
         }
+    });
+
+    // ၃။ Group အလိုက် စာပို့မယ်
+    for (const key in groupMap) {
+        const target = groupMap[key];
+        
+        // Random ဟာသ Quote တစ်ခု ယူမယ်
+        const randomQuote = funnyQuotes[Math.floor(Math.random() * funnyQuotes.length)];
+        
+        const mentionText = target.mentions.length > 0 
+            ? `\n\n🎯 *${randomQuote}*\n🔔 Noti: ${target.mentions.join(" ")}` 
+            : "";
+
+        const kickOffMsg = `🎬 *လူကြီးမင်းတို့ Noti ယူထားတဲ့ ပွဲစပြီဗျို့!*\n\n` +
+                           `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
+                           `🏆 ${m.league.name}${mentionText}`;
+
+        await bot.api.sendMessage(target.chatId, kickOffMsg, { 
+            parse_mode: "Markdown", 
+            message_thread_id: target.topicId || 0 
+        }).catch(e => console.error(`Group Noti Error (${target.chatId}):`, e.message));
+    }
+}
+        // (B) Goal Notification
+       // (B) Goal Notification
+if (oldLive && oldLive.score !== currentScore) {
+    const [oldHome, oldAway] = oldLive.score.split('-').map(Number);
+    const [curHome, curAway] = currentScore.split('-').map(Number);
+    
+    let scoringTeamName = (curHome > oldHome) ? m.teams.home.name : m.teams.away.name;
+    let scoringTeamLogo = (curHome > oldHome) ? m.teams.home.logo : m.teams.away.logo;
+
+    const lastGoalEvent = (m.events && Array.isArray(m.events)) 
+                        ? m.events.filter(e => e.type === "Goal").pop() 
+                        : null;
+    const scorerName = lastGoalEvent?.player?.name || "ဂိုးဝင်သွားသည်";
+
+    // ၁။ Subscribe လုပ်ထားတဲ့ User တွေကို ရှာပြီး Group လိုက် စုစည်းမယ်
+    const subscribers = await User.find({ "subscriptions.fixtureId": m.fixture.id });
+    const groupMap = {};
+
+    subscribers.forEach(user => {
+        const sub = user.subscriptions.find(s => s.fixtureId === m.fixture.id);
+        if (sub && sub.chatId) {
+            const key = `${sub.chatId}_${sub.topicId || 0}`;
+            if (!groupMap[key]) {
+                groupMap[key] = {
+                    chatId: sub.chatId,
+                    topicId: sub.topicId,
+                    mentions: []
+                };
+            }
+            const mention = user.username 
+                ? `@${user.username}` 
+                : `[${user.name || 'User'}](tg://user?id=${user.userId})`;
+            groupMap[key].mentions.push(mention);
+        }
+    });
+
+    // ၂။ စုစည်းထားတဲ့ Group တစ်ခုချင်းစီကို ပုံနဲ့တကွ Noti ပို့မယ်
+    for (const key in groupMap) {
+        const target = groupMap[key];
+     const goalQuotes = [
+        "💸 *ဒီဂိုးလေးသာ ဆက်ထိန်းထားရင် မနက်ဖြန် မာလာရှမ်းကော စားရပြီ!*",
+        "🧻 *ဟိုဘက်အသင်းကလူတွေ တစ်ရှူး အထုပ်လိုက် ပြင်ထားတော့!*",
+        "🍔 *ဒီညတော့ မာမား မစားရတော့ဘူး ထင်တယ်နော်!*",
+        "💔 *ဒီဂိုးက ရည်းစားထားတာထက်တောင် ပိုရင်ခုန်ဖို့ ကောင်းတယ်!*",
+        "🥘 *မာလာရှမ်းကောတင် မကဘူး၊ နက်ဖြန် တစ်ဝိုင်းလုံး ငါဒိုင်ခံမယ်!*",
+        "👸 *ဂိုးမြင်ရတာ မယားငယ်ရသလို ရင်ခုန်လိုက်တာ!*"
+    ];
+
+    const randomGoalQuote = goalQuotes[Math.floor(Math.random() * goalQuotes.length)];
+
+    // mentionText ထဲမှာ quote ကို တိုက်ရိုက်ထည့်လိုက်ပါ (quote ထဲမှာ bold ပါပြီးသားမို့လို့ပါ)
+    const mentionText = target.mentions.length > 0 
+        ? `\n\n🎯 ${randomGoalQuote}\n🔔 Noti: ${target.mentions.join(" ")}` 
+        : "";
+
+    const goalMsg = `⚽ *GOAL!!! (ဂိုးဝင်သွားပါပြီ)*\n\n` +
+                    `🥅 *${m.teams.home.name}* ${currentScore} *${m.teams.away.name}*\n` +
+                    `🚩 Scoring Team: *${scoringTeamName}*\n` +
+                    `👤 Scorer: *${scorerName}*\n` +
+                    `🕒 Time: ${matchStatus} (${elapsed}')${mentionText}`;
+
+        try {
+            // Photo ပို့တဲ့အခါ သက်ဆိုင်ရာ chatId နဲ့ topicId သုံးမယ်
+            await bot.api.sendPhoto(target.chatId, scoringTeamLogo || m.teams.home.logo, {
+                caption: goalMsg,
+                parse_mode: "Markdown",
+                message_thread_id: target.topicId || 0
+            });
+        } catch (e) {
+            // Photo ပို့မရရင် စာသားပဲ ပို့မယ်
+            await bot.api.sendMessage(target.chatId, goalMsg, { 
+                parse_mode: "Markdown", 
+                message_thread_id: target.topicId || 0 
+            }).catch(err => console.error(`Goal Noti Send Error (${target.chatId}):`, err.message));
+        }
+    }
+}
 
         // (C) Live Cache Update (Sub လုပ်ထားသူ ရှိတဲ့ပွဲများအတွက်)
         await LiveCache.findOneAndUpdate(
