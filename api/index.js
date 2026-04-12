@@ -430,6 +430,7 @@ bot.on("callback_query:data", async (ctx) => {
                     fixtureId: fid, 
                     home: m.home, 
                     away: m.away, 
+                    startTime: new Date(m.fixture.date),
                     isStartedNotified: false,
                     chatId: chatId,
                     topicId: threadId
