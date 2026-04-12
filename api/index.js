@@ -38,8 +38,7 @@ const leagueNames = {
     "848": "🇪🇺 UEFA Conference League", "39": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", "140": "🇪🇸 La Liga",
     "135": "🇮🇹 Serie A", "78": "🇩🇪 Bundesliga", "61": "🇫🇷 Ligue 1",
     "40": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship", "88": "🇳🇱 Eredivisie", "94": "🇵🇹 Primeira Liga",
-    "71": "🇧🇷 Serie A", "13": "🌎 Libertadores", "235": "🇷🇺 Russia Premier League",
-    "466": "🇲🇲 Myanmar League"
+    "71": "🇧🇷 Serie A", "13": "🌎 Libertadores", "235": "🇷🇺 Russia Premier League"
 };
 
 const toMMT = (date) => new Date(date).toLocaleString('en-GB', { 
