@@ -99,3 +99,66 @@ const processAndNotify = async (fixtures) => {
     }
     console.log(`🏁 [FINISHED] All fixtures processed.\n`);
 };
+
+
+module.exports = async (req, res) => {
+    try {
+        await connectDB();
+
+        if (req.method === 'POST') {
+            console.log("🚀 Incoming POST Request");
+            const { fixtures } = req.body;
+            
+            if (fixtures && Array.isArray(fixtures)) {
+                // Background ထက်စာရင် await သုံးပြီး log ကို အရင်စစ်ကြည့်ပါ (Debug အတွက်)
+                await processAndNotify(fixtures); 
+                return res.status(200).json({ success: true, count: fixtures.length });
+            }
+            return res.status(400).send("Invalid fixtures data.");
+        }
+        
+        if (req.method === 'GET') {
+            console.log("🚀 Incoming GET (Cron) Request");
+            const now = new Date();
+            const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
+            
+            if (usersWithSubs.length === 0) {
+                console.log("⚠️ No subscriptions found.");
+                return res.status(200).send("Cron: No subscriptions found.");
+            }
+
+            const subFixtureIds = [...new Set(usersWithSubs.flatMap(u => u.subscriptions.map(s => s.fixtureId)))];
+            const activeMatches = await Match.find({ 
+                fixtureId: { $in: subFixtureIds }, 
+                utcDate: { $lte: now } 
+            });
+
+            if (activeMatches.length === 0) {
+                console.log("⚠️ No active subbed matches found.");
+                return res.status(200).send("Cron: No active subbed matches.");
+            }
+
+            console.log("📡 Fetching from API Sports...");
+            const apiRes = await fetch("https://v3.football.api-sports.io/fixtures?live=all", {
+                headers: { 'x-apisports-key': APISPORTS_KEY }
+            });
+            const resData = await apiRes.json();
+
+            if (resData.response && resData.response.length > 0) {
+                await LiveCache.findOneAndUpdate(
+                    { type: "global_sync_timer" },
+                    { lastUpdated: now },
+                    { upsert: true }
+                );
+                console.log("⏰ Global timer updated.");
+                await processAndNotify(resData.response);
+                return res.status(200).send("Cron sync completed.");
+            }
+            return res.status(200).send("No live data from API.");
+        }
+    } catch (err) {
+        console.error("❌ Error:", err.message);
+        res.status(500).send(err.message);
+    }
+};
+
