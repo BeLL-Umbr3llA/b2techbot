@@ -60,9 +60,9 @@ const userSchema = new mongoose.Schema({
 });
 
 const apiLogSchema = new mongoose.Schema({
-    date: { type: String }, // "2026-04-12"
-    endpoint: { type: String }, // "API1" သို့မဟုတ် "API2"
-    count: { type: Number, default: 0 }
+    date: { type: String, unique: true },
+    api1_count: { type: Number, default: 0 },
+    api2_count: { type: Number, default: 0 }
 });
 
 
