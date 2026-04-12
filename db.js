@@ -65,8 +65,6 @@ const apiLogSchema = new mongoose.Schema({
     count: { type: Number, default: 0 }
 });
 
-// date နဲ့ endpoint အတွဲလိုက်ကို Unique ဖြစ်အောင် လုပ်ထားရင် ပိုကောင်းပါတယ်
-apiLogSchema.index({ date: 1, endpoint: 1 }, { unique: true });
 
 // --- Models များကို Create လုပ်ခြင်း (သို့မဟုတ်) Existing model ကို ယူခြင်း ---
 // OverwriteModelError ကို ကာကွယ်ရန် mongoose.models ကို အရင်စစ်ရပါမယ်
