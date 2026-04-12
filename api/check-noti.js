@@ -36,12 +36,13 @@ const processAndNotify = async (fixtures) => {
             // --- Cache Update Only (Optional) ---
             await LiveCache.findOneAndUpdate(
                 { fixtureId: fid },
-                {
+                { 
                     home: m.teams.home.name,
                     away: m.teams.away.name,
                     score: currentScore,
                     elapsed: elapsed,
                     status: matchStatus,
+                    leagueId: m.league.id,
                     lastUpdated: new Date()
                 },
                 { upsert: true }
