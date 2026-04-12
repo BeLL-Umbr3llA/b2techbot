@@ -358,6 +358,37 @@ bot.command("live", async (ctx) => {
     }
 });
 
+bot.command("countapi", async (ctx) => {
+    try {
+        // UTC ရက်စွဲ (YYYY-MM-DD) ကို ယူမယ်
+        const todayUTC = new Date().toISOString().split('T')[0];
+        
+        // Database ထဲမှာ အဲဒီရက်စွဲနဲ့ Log ကို ရှာမယ်
+        const log = await ApiLog.findOne({ date: todayUTC });
+
+        if (!log) {
+            return ctx.reply(`📊 *${todayUTC} (UTC)* အတွက် API အသုံးပြုမှု မှတ်တမ်းမရှိသေးပါ။`, { parse_mode: "Markdown" });
+        }
+
+        const total = log.api1_count + log.api2_count;
+
+        const reportMsg = 
+            `📊 *Daily API Usage Report (UTC)*\n` +
+            `📅 Date: *${log.date}*\n` +
+            `--- --- --- --- --- ---\n` +
+            `🔹 *API 1 (Manual/POST):* ${log.api1_count} ကြိမ်\n` +
+            `🔹 *API 2 (Cron/GET):* ${log.api2_count} ကြိမ်\n\n` +
+            `📈 *Total Usage:* ${total} ကြိမ်\n` +
+            `⚠️ _Note: API limits reset at 00:00 UTC._`;
+
+        return ctx.reply(reportMsg, { parse_mode: "Markdown" });
+
+    } catch (err) {
+        console.error("❌ CountAPI Error:", err.message);
+        ctx.reply("❌ API စာရင်း ကြည့်ရှုရာတွင် အမှားအယွင်းရှိပါသည်။");
+    }
+});
+
 // --- ၄။ Handlers ---
 bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
