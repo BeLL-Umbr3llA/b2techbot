@@ -213,6 +213,33 @@ module.exports = async (req, res) => {
     try {
         await connectDB();
         const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+
+        // --- ဒီနေရာမှာ အမှိုက်အရင်ရှင်းမယ် (Cleanup Logic) ---
+        const threeHoursAgo = new Date(now.getTime() - (120 * 60 * 1000));
+        
+        console.log("🧹 Starting backup cleanup...");
+        
+        // ၁။ ပွဲစချိန် ၃ နာရီကျော်နေတဲ့ sub တွေကို ဖယ်ထုတ်မယ်
+        await User.updateMany(
+            { "subscriptions.startTime": { $lte: threeHoursAgo } },
+            { $pull: { subscriptions: { startTime: { $lte: threeHoursAgo } } } }
+        );
+
+        // ၂။ ပွဲဟောင်းတွေကို Match နဲ့ Cache ထဲက ရှင်းမယ်
+        await Match.deleteMany({ utcDate: { $lte: threeHoursAgo } });
+        await LiveCache.deleteMany({ 
+            $or: [
+                { lastUpdated: { $lte: threeHoursAgo }, status: { $in: ['FT', 'AET', 'PEN'] } },
+                { type: { $ne: "global_sync_timer" }, lastUpdated: { $lte: threeHoursAgo } } // timer မဟုတ်တဲ့ ၃ နာရီကျော် data တွေအကုန်ဖြုတ်
+            ]
+        });
+
+        // ၃။ Sub မရှိတော့တဲ့ User တွေကို ဖျက်မယ်
+        await User.deleteMany({ subscriptions: { $size: 0 } });
+        
+        console.log("✅ Cleanup finished.");
+        
         if (req.method === 'POST') {
             console.log("🚀 Incoming POST Request");
 
