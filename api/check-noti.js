@@ -227,8 +227,23 @@ module.exports = async (req, res) => {
         if (req.method === 'GET') {
             console.log("🚀 Incoming GET (Cron) Request");
             const now = new Date();
-            const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
-            
+         
+
+              // 1. အရင်ဆုံး Global Timer ကို စစ်ဆေးမယ်
+            const globalSync = await LiveCache.findOne({ type: "global_sync_timer" });
+    
+            if (globalSync && globalSync.lastUpdated) {
+                const lastUpdate = new Date(globalSync.lastUpdated);
+                const diffInMs = now - lastUpdate;
+                const oneMinute = 60 * 1000; // 60,000 ms
+
+        if (diffInMs < oneMinute) {
+            console.log(`⏳ Skip: Last sync was only ${Math.round(diffInMs / 1000)}s ago.`);
+            return res.status(200).send("Cron: Skipped, too soon.");
+        }
+    }
+
+         const usersWithSubs = await User.find({ "subscriptions.0": { $exists: true } });
             if (usersWithSubs.length === 0) {
                 console.log("⚠️ No subscriptions found.");
                 return res.status(200).send("Cron: No subscriptions found.");
