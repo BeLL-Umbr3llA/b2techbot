@@ -1,18 +1,12 @@
 require('dotenv').config();
-const { connectDB, Match, LiveCache } = require("../db");
+const { connectDB, Match, LiveCache } = require("./db"); // Path မှန်အောင် ပြန်စစ်ပါ
 
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
+const TARGET_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
 
-/**
- * ပြင်ဆင်လိုက်သည့် League IDs:
- * 2: Champions League, 3: Europa League, 848: Conference League
- * 352: Myanmar League (ID ကို 352 သို့ Fix လုပ်ထားသည်)
- */
-const TARGET_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235,466];
-
-// မြန်မာစံတော်ချိန် (UTC+6:30) နဲ့ ရက်စွဲယူခြင်း
 const getMMDate = (offsetDays = 0) => {
     const d = new Date();
+    // မြန်မာစံတော်ချိန်အတွက် Offset ညှိခြင်း
     d.setMinutes(d.getMinutes() + d.getTimezoneOffset() + 390); 
     d.setDate(d.getDate() + offsetDays);
     return d.toISOString().split('T')[0];
@@ -23,26 +17,21 @@ const syncMatches = async () => {
         await connectDB();
         
         console.log(`🧹 Cleaning up old data...`);
-        // အဟောင်းတွေကို အကုန်ဖျက်ပြီးမှ အသစ်ပြန်သွင်းတာက Data တွေ မှားမနေအောင် အကောင်းဆုံးပါပဲ
         const deletedMatches = await Match.deleteMany({});
         const deletedCaches = await LiveCache.deleteMany({});
-
         const cleanupMsg = `🗑️ Database Cleaned: Removed ${deletedMatches.deletedCount} matches.`;
-        console.log(cleanupMsg);
 
         const datesToFetch = [getMMDate(0), getMMDate(1)]; 
         let totalSynced = 0;
 
         for (const date of datesToFetch) {
             console.log(`📡 Fetching matches for ${date}...`);
-            
             const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}`, {
                 headers: { 'x-apisports-key': APISPORTS_KEY }
             });
             const resData = await response.json();
 
             if (resData.response && resData.response.length > 0) {
-                // TARGET_LEAGUES ထဲက ပွဲတွေကို Filter လုပ်မယ် (ID ကို Number ပြောင်းစစ်)
                 const filteredMatches = resData.response.filter(m => 
                     TARGET_LEAGUES.includes(Number(m.league.id))
                 );
@@ -54,7 +43,7 @@ const syncMatches = async () => {
                             update: {
                                 $set: {
                                     fixtureId: Number(m.fixture.id),
-                                    leagueId: Number(m.league.id), // ပြဿနာတက်တတ်တဲ့နေရာကို Number Fix လုပ်လိုက်ပြီ
+                                    leagueId: Number(m.league.id),
                                     leagueName: m.league.name,
                                     home: m.teams.home.name, 
                                     away: m.teams.away.name,
@@ -71,25 +60,24 @@ const syncMatches = async () => {
 
                     await Match.bulkWrite(bulkOps);
                     totalSynced += filteredMatches.length;
-                    console.log(`✅ Synced ${filteredMatches.length} matches for ${date}.`);
                 }
             }
         }
-
-        return { 
-            success: true, 
-            syncedCount: totalSynced, 
-            cleanupInfo: cleanupMsg 
-        };
-
+        return { success: true, syncedCount: totalSynced, cleanupInfo: cleanupMsg };
     } catch (err) {
         console.error("❌ Sync Error:", err.message);
         return { success: false, error: err.message };
     }
 };
 
-// --- Vercel/HTTP Handler ---
+// --- Vercel HTTP Handler ---
 module.exports = async (req, res) => {
+    // ✅ Security: Vercel Cron က ပို့လိုက်တဲ့ Secret ကို စစ်ဆေးခြင်း
+    const authHeader = req.headers['authorization'];
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return res.status(401).json({ status: "Error", message: "Unauthorized Request" });
+    }
+
     const result = await syncMatches();
     if (result.success) {
         res.status(200).json({
@@ -102,14 +90,3 @@ module.exports = async (req, res) => {
     }
 };
 
-// --- Local Execution ---
-if (require.main === module) {
-    syncMatches().then(res => {
-        if (res.success) {
-            console.log(`🏁 Sync Process Finished.`);
-            process.exit(0);
-        } else {
-            process.exit(1);
-        }
-    });
-}
