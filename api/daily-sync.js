@@ -101,8 +101,9 @@ const syncMatches = async () => {
 
          // ✅ Sync ပြီးတာနဲ့ Telegram ကို အသိပေးချက်ပို့ခြင်း
         const notifyMsg = '<b>✅ Daily Sync Success!</b>\n\n' +
-                          '📅 Date: ' + todayUTC +'&'+ tomorrowUTC + '\n' 
-                           +cleanupMsg + '\n' +
+                          '📅 Date: ' + todayUTC + '\n' +
+                          '📅 Date: ' + tomorrowUTC + '\n'
+                          +cleanupMsg + '\n' +
                           '♻️ SyncMatches: ' + totalSynced + '\n';
 
         await sendTelegramUpdate(notifyMsg);
