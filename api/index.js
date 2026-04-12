@@ -151,9 +151,10 @@ async function sendMatchDetail(ctx, m) {
                 `⚽️ *ပွဲစဉ်အသေးစိတ်*\n\n` +
                 `🏆 *${escapeMarkdown(m.leagueName)}*\n` +
                 `🆚 *${escapeMarkdown(m.home)}* vs *${escapeMarkdown(m.away)}*\n` +
-                `📅 *${toMMT(m.utcDate)}*\n\n` +
+                `📅 *${toMMT(m.utcDate)}*\n` +
+                 `🕒 *အခြေအနေ:* ပွဲမစသေးပါ\n\n`+
                 `💬 ${escapeMarkdown(funnyMsg)}\n` +
-                `🕒 *အခြေအနေ:* ပွဲမစသေးပါ`;
+               ;
             
             return ctx.reply(msg, { 
                 parse_mode: "Markdown", 
