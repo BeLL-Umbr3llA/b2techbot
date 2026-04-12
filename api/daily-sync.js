@@ -5,13 +5,6 @@ const APISPORTS_KEY = process.env.APISPORTS_KEY;
 const TARGET_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN; // .env မှာ ထည့်ပါ
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;     // .env မှာ ထည့်ပါ
-const getMMDate = (offsetDays = 0) => {
-    const d = new Date();
-    // မြန်မာစံတော်ချိန်အတွက် Offset ညှိခြင်း
-    d.setMinutes(d.getMinutes() + d.getTimezoneOffset() + 390); 
-    d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().split('T')[0];
-};
 
 // Telegram ကို Message ပို့သည့် Function
 const sendTelegramUpdate = async (message) => {
@@ -35,14 +28,27 @@ const sendTelegramUpdate = async (message) => {
 const syncMatches = async () => {
     try {
         await connectDB();
-        const today = new Date().toISOString().split('T')[0];
         
         console.log(`🧹 Cleaning up old data...`);
         const deletedMatches = await Match.deleteMany({});
         const deletedCaches = await LiveCache.deleteMany({});
         const cleanupMsg = `🗑️ Database Cleaned: ${deletedMatches.deletedCount} matches.`;
 
-        const datesToFetch = [getMMDate(0), getMMDate(1)]; 
+         // --- UTC ရက်စွဲ ထုတ်ယူခြင်း ---
+        const now = new Date();
+        
+        // ဒီနေ့ UTC ရက်စွဲ (YYYY-MM-DD)
+        const todayUTC = now.toISOString().split('T')[0];
+        
+        // မနက်ဖြန် UTC ရက်စွဲ (YYYY-MM-DD)
+        const tomorrow = new Date(now);
+        tomorrow.setUTCDate(now.getUTCDate() + 1);
+        const tomorrowUTC = tomorrow.toISOString().split('T')[0];
+
+        console.log(`📡 Fetching UTC Dates: ${todayUTC} and ${tomorrowUTC}`);
+
+        // ၁၃ ရက်နဲ့ ၁၄ ရက် (UTC အတိုင်း) Fetch လုပ်မည့်စာရင်း
+        const datesToFetch = [todayUTC, tomorrowUTC]; 
         let totalSynced = 0;
 
         for (const date of datesToFetch) {
@@ -53,7 +59,7 @@ const syncMatches = async () => {
             const resData = await response.json();
             
             await ApiLog.findOneAndUpdate(
-                { date: today },
+                { date: todayUTC },
                 { $inc: { api1_count: 1 } },
                 { upsert: true }
             );
