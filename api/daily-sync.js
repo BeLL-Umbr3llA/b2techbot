@@ -40,7 +40,7 @@ const syncMatches = async () => {
         console.log(`🧹 Cleaning up old data...`);
         const deletedMatches = await Match.deleteMany({});
         const deletedCaches = await LiveCache.deleteMany({});
-        const cleanupMsg = `🗑️ Database Cleaned: Removed ${deletedMatches.deletedCount} matches.`;
+        const cleanupMsg = `🗑️ Database Cleaned: ${deletedMatches.deletedCount} matches.`;
 
         const datesToFetch = [getMMDate(0), getMMDate(1)]; 
         let totalSynced = 0;
@@ -94,9 +94,10 @@ const syncMatches = async () => {
         console.log(`📡 going to telegram`);
 
          // ✅ Sync ပြီးတာနဲ့ Telegram ကို အသိပေးချက်ပို့ခြင်း
-        const notifyMsg = `<b>✅ Daily Sync Success!</b>\n\n
-        📅 Date: ${today}\n⚽ Matches: ${totalSynced}\n
-        🗑️ Cleaned: ${cleanupMsg}`;
+        const notifyMsg = `<b>✅ Daily Sync Success!</b>\n\n'+
+       '📅 Date: ${today}\n'+
+       '${cleanupMsg}\n`+
+       '♻️ SyncMatches: ${totalSynced}\n';
         await sendTelegramUpdate(notifyMsg);
         console.log(`📡after going to telegram`);
         return { success: true, syncedCount: totalSynced, cleanupInfo: cleanupMsg };
