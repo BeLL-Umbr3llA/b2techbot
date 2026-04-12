@@ -53,6 +53,7 @@ const userSchema = new mongoose.Schema({
         fixtureId: Number, 
         home: String, 
         away: String, 
+        startTime: Date, // ဒီပွဲစမယ့်အချိန်ကို Date object အနေနဲ့ သိမ်းမယ်
         isStartedNotified: { type: Boolean, default: false },
         chatId: { type: Number }, 
         topicId: { type: Number, default: 0 }
