@@ -4,6 +4,10 @@
     {
       "source": "/api/index",
       "destination": "/index.js"
+    },
+    {
+      "source": "/api/daily-sync",
+      "destination": "/daily-sync.js"
     }
   ],
   "crons": [
@@ -13,4 +17,3 @@
     }
   ]
 }
-
