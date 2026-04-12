@@ -16,6 +16,7 @@ const getMMDate = (offsetDays = 0) => {
 // Telegram ကို Message ပို့သည့် Function
 const sendTelegramUpdate = async (message) => {
     try {
+        console.log(`📡 going to chat id telegram`);
         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -90,12 +91,14 @@ const syncMatches = async () => {
             }
         }
 
+        console.log(`📡 going to telegram`);
+
          // ✅ Sync ပြီးတာနဲ့ Telegram ကို အသိပေးချက်ပို့ခြင်း
         const notifyMsg = `<b>✅ Daily Sync Success!</b>\n\n
         📅 Date: ${today}\n⚽ Matches: ${totalSynced}\n
         🗑️ Cleaned: ${cleanupMsg}`;
         await sendTelegramUpdate(notifyMsg);
-        
+        console.log(`📡after going to telegram`);
         return { success: true, syncedCount: totalSynced, cleanupInfo: cleanupMsg };
     } catch (err) {
         console.error("❌ Sync Error:", err.message);
