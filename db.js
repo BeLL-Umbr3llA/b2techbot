@@ -52,7 +52,8 @@ const userSchema = new mongoose.Schema({
         fixtureId: Number, 
         home: String, 
         away: String, 
-        isStartedNotified: { type: Boolean, default: false } 
+        isStartedNotified: { type: Boolean, default: false },
+        topicId: { type: Number, default: 0 }
     }]
 });
 
