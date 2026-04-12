@@ -273,7 +273,17 @@ module.exports = async (req, res) => {
                     { upsert: true }
                 );
                 console.log("⏰ Global timer updated.");
-                await processAndNotify(resData.response);
+
+
+            const topLeagueMatches = resData.response.filter(match => 
+            TOP_LEAGUES.includes(match.league.id) );
+
+                console.log(`📊 Filtered: ${topLeagueMatches.length} Top League matches.`);
+
+                // ၅။ စစ်ထုတ်ထားတဲ့ ပွဲတွေကိုပဲ processAndNotify ထံ ပို့မယ်
+                // (မှတ်ချက် - သိမ်းဆည်းခြင်း logic ကို processAndNotify ထဲမှာ ထည့်ထားရပါမယ်)
+                await processAndNotify(topLeagueMatches);
+    
                 return res.status(200).send("Cron sync completed.");
             }
             return res.status(200).send("No live data from API.");
