@@ -1,4 +1,3 @@
-
 {
   "version": 2,
   "rewrites": [
@@ -6,5 +5,12 @@
       "source": "/api/index",
       "destination": "/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/match-sync",
+      "schedule": "30 0 * * *"
+    }
   ]
 }
+
