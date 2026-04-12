@@ -36,6 +36,7 @@ const matchSchema = new mongoose.Schema({
 const liveCacheSchema = new mongoose.Schema({ // Variable name ကို တစ်သမတ်တည်းဖြစ်အောင် အသေးပြောင်းထားတယ်
     type: { type: String, default: "match_data" }, 
     fixtureId: { type: Number },
+    leagueId: { type: Number },
     home: String,
     away: String,
     score: String,
