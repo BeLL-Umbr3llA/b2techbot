@@ -407,6 +407,8 @@ bot.on("callback_query:data", async (ctx) => {
 
     if (data.startsWith("sub_")) {
     const threadId = ctx.callbackQuery?.message?.message_thread_id || ctx.message?.message_thread_id ;
+    const chatId = ctx.chat.id;
+        
     const fid = Number(data.split("_")[1]);
     const m = await Match.findOne({ fixtureId: fid });
         
@@ -430,6 +432,7 @@ bot.on("callback_query:data", async (ctx) => {
                     home: m.home, 
                     away: m.away, 
                     isStartedNotified: false,
+                    chatId: chatId,
                     topicId: threadId
                 } 
             } 
