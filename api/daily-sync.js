@@ -33,8 +33,8 @@ const sendTelegramUpdate = async (message) => {
 
 const syncMatches = async () => {
     try {
-        await connectDB();const 
-        today = new Date().toISOString().split('T')[0];
+        await connectDB();
+        const today = new Date().toISOString().split('T')[0];
         
         console.log(`🧹 Cleaning up old data...`);
         const deletedMatches = await Match.deleteMany({});
