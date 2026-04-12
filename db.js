@@ -60,9 +60,13 @@ const userSchema = new mongoose.Schema({
 });
 
 const apiLogSchema = new mongoose.Schema({
-    date: { type: String, unique: true }, // "2024-04-10"
+    date: { type: String }, // "2026-04-12"
+    endpoint: { type: String }, // "API1" သို့မဟုတ် "API2"
     count: { type: Number, default: 0 }
 });
+
+// date နဲ့ endpoint အတွဲလိုက်ကို Unique ဖြစ်အောင် လုပ်ထားရင် ပိုကောင်းပါတယ်
+apiLogSchema.index({ date: 1, endpoint: 1 }, { unique: true });
 
 // --- Models များကို Create လုပ်ခြင်း (သို့မဟုတ်) Existing model ကို ယူခြင်း ---
 // OverwriteModelError ကို ကာကွယ်ရန် mongoose.models ကို အရင်စစ်ရပါမယ်
