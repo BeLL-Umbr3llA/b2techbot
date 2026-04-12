@@ -53,6 +53,7 @@ const userSchema = new mongoose.Schema({
         home: String, 
         away: String, 
         isStartedNotified: { type: Boolean, default: false },
+        chatId: { type: Number }, 
         topicId: { type: Number, default: 0 }
     }]
 });
