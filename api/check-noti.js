@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Bot } = require("grammy");
-const { connectDB, User, LiveCache, Match } = require("../db");
+const { connectDB, User, LiveCache, Match,ApiLog } = require("../db");
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
