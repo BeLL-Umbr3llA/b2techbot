@@ -216,8 +216,8 @@ module.exports = async (req, res) => {
             console.log("🚀 Incoming POST Request");
 
             await ApiLog.findOneAndUpdate(
-                { date: today, endpoint: "API1" },
-                { $inc: { count: 1 } },
+                { date: today },
+                { $inc: { api1_count: 1 } },
                 { upsert: true }
             );
             const { fixtures } = req.body;
@@ -272,9 +272,9 @@ module.exports = async (req, res) => {
             });
             const resData = await apiRes.json();
             if (apiRes.ok) { // API ခေါ်တာ အောင်မြင်မှသာ မှတ်မယ်
-                await ApiLog.findOneAndUpdate(
-                      { date: today, endpoint: "API2" },
-                    { $inc: { count: 1 } },
+               await ApiLog.findOneAndUpdate(
+                    { date: today },
+                    { $inc: { api2_count: 1 } },
                     { upsert: true }
                 );
                 }
