@@ -359,6 +359,7 @@ bot.command("live", async (ctx) => {
 });
 
 bot.command("countapi", async (ctx) => {
+    await connectDB();
     try {
         // UTC ရက်စွဲ (YYYY-MM-DD) ကို ယူမယ်
         const todayUTC = new Date().toISOString().split('T')[0];
