@@ -66,6 +66,15 @@ const apiLogSchema = new mongoose.Schema({
     api2_count: { type: Number, default: 0 }
 });
 
+const StandingSchema = new mongoose.Schema({
+    leagueId: Number,
+    leagueName: String,
+    season: Number,
+    table: Array, // အသင်းအားလုံးရဲ့ ရမှတ်စာရင်း
+    lastUpdated: { type: Date, default: Date.now }
+});
+
+
 
 // --- Models များကို Create လုပ်ခြင်း (သို့မဟုတ်) Existing model ကို ယူခြင်း ---
 // OverwriteModelError ကို ကာကွယ်ရန် mongoose.models ကို အရင်စစ်ရပါမယ်
@@ -74,6 +83,6 @@ const Match = mongoose.models.Match || mongoose.model("Match", matchSchema);
 const LiveCache = mongoose.models.LiveCache || mongoose.model("LiveCache", liveCacheSchema);
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 const ApiLog = mongoose.models.ApiLog || mongoose.model("ApiLog", apiLogSchema);
-
+const Standing = mongoose.model("Standing", StandingSchema)|| mongoose.model("Standing", StandingSchema);;
 // Module Exports မှာ အကုန်လုံး ပါဝင်ကြောင်း သေချာစေရမယ်
-module.exports = { connectDB, Match, LiveCache, User, ApiLog };
+module.exports = { connectDB, Match, LiveCache, User, ApiLog,Standing };
