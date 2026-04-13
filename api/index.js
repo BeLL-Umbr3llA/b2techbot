@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Bot, webhookCallback, InlineKeyboard } = require("grammy");
-const { connectDB, Match, LiveCache, User, ApiLog } = require("../db"); // ApiLog ထည့်သွင်းထားသည်
+const { connectDB, Match, LiveCache, User, ApiLog, Standing } = require("../db"); // ApiLog ထည့်သွင်းထားသည်
 const Fuse = require("fuse.js");
 const axios = require('axios');
 const bot = new Bot(process.env.BOT_TOKEN);
@@ -389,6 +389,16 @@ bot.command("countapi", async (ctx) => {
     }
 });
 
+bot.command("table", async (ctx) => {
+    const keyboard = new InlineKeyboard()
+        .text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", "standings:PL").text("🇪🇸 La Liga", "standings:PD").row()
+        .text("🇮🇹 Serie A", "standings:SA").text("🇩🇪 Bundesliga", "standings:BL1").row()
+        .text("🇫🇷 Ligue 1", "standings:FL1").text("🇪🇺 Champions League", "standings:CL").row()
+        .text("🏆 World Cup", "standings:WC").text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship", "standings:ELC");
+
+    await ctx.reply("📊 Standing Table League ကို ရွေးချယ်ပေးပါ-", { reply_markup: keyboard });
+});
+
 // --- ၄။ Handlers ---
 bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
@@ -479,6 +489,55 @@ bot.on("callback_query:data", async (ctx) => {
         console.error("❌ Callback Error:", err);
         
     }
+
+if (data.startsWith("standings:")) {
+    const threadId = ctx.callbackQuery?.message?.message_thread_id || ctx.message?.message_thread_id;
+    const leagueCode = data.split(":")[1]; // ဥပမာ - PL, PD
+
+    try {
+        const { Standing } = require("../db"); // Path မှန်အောင်စစ်ပါ
+        
+        // Football-Data API Code ကို Database League ID နဲ့ ချိတ်ဆက်ရန် (Helper)
+        const leagueMap = {
+            'PL': 2021, 'ELC': 2001, 'FL1': 2015, 'SA': 2019, 
+            'PPL': 2017, 'PD': 2014, 'CL': 2001, 'EC': 2018, 'WC': 2000
+        };
+        
+        const targetId = leagueMap[leagueCode];
+        const leagueData = await Standing.findOne({ leagueId: targetId });
+
+        if (!leagueData || !leagueData.table) {
+            return ctx.reply("❌ ဇယားဒေတာ ရှာမတွေ့သေးပါ။ ခဏနေမှ ပြန်ကြိုးစားပါ။", { message_thread_id: threadId });
+        }
+
+        let tableMsg = `<b>📊 ${leagueData.leagueName} Table</b>\n`;
+        tableMsg += `<code>Pos Team       P  GD Pts</code>\n`;
+        tableMsg += `<code>-------------------------</code>\n`;
+
+        // ပထမ အသင်း ၂၀ ထိပဲ ပြမယ်
+        leagueData.table.slice(0, 20).forEach((row) => {
+            const pos = row.position.toString().padEnd(2, ' ');
+            const team = (row.team.shortName || row.team.name).substring(0, 10).padEnd(10, ' ');
+            const played = row.playedGames.toString().padEnd(2, ' ');
+            const gd = row.goalDifference.toString().padEnd(2, ' ');
+            const pts = row.points.toString().padEnd(2, ' ');
+
+            tableMsg += `<code>${pos}  ${team} ${played} ${gd} ${pts}</code>\n`;
+        });
+
+        tableMsg += `\n📅 <i>Last Updated: ${new Date(leagueData.lastUpdated).toLocaleTimeString()}</i>`;
+
+        return ctx.reply(tableMsg, { 
+            parse_mode: "HTML", 
+            message_thread_id: threadId 
+        });
+
+    } catch (err) {
+        console.error("❌ Table Error:", err);
+        return ctx.reply("❌ ဇယားထုတ်ပေးရာတွင် အမှားအယွင်းရှိပါသည်။", { message_thread_id: threadId });
+    }
+}
+    
 }); 
 
 bot.on("message:text", async (ctx) => {
