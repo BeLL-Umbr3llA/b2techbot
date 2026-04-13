@@ -391,12 +391,31 @@ bot.command("countapi", async (ctx) => {
 
 bot.command("table", async (ctx) => {
     const keyboard = new InlineKeyboard()
-        .text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", "standings:PL").text("🇪🇸 La Liga", "standings:PD").row()
-        .text("🇮🇹 Serie A", "standings:SA").text("🇩🇪 Bundesliga", "standings:BL1").row()
-        .text("🇫🇷 Ligue 1", "standings:FL1").text("🇪🇺 Champions League", "standings:CL").row()
-        .text("🏆 World Cup", "standings:WC").text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship", "standings:ELC");
+        // Row 1
+        .text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League", "standings:PL")
+        .text("🇪🇸 La Liga", "standings:PD")
+        .row() 
+        // Row 2
+        .text("🇮🇹 Serie A", "standings:SA")
+        .text("🇩🇪 Bundesliga", "standings:BL1")
+        .row()
+        // Row 3
+        .text("🇫🇷 Ligue 1", "standings:FL1")
+        .text("🇪🇺 Champions League", "standings:CL")
+        .row()
+        // Row 4
+        .text("🇵🇹 Primeira Liga", "standings:PPL")
+        .text("🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship", "standings:ELC")
+        .row()
+        // Row 5 (ကျန်နေတဲ့ ၁ ခု)
+        .text("🏆 World Cup", "standings:WC");
 
-    await ctx.reply("📊 Standing Table League ကို ရွေးချယ်ပေးပါ-", { reply_markup: keyboard });
+    const threadId = ctx.message?.message_thread_id;
+
+    await ctx.reply("📊 Standing Table ကြည့်လိုသော League ကို ရွေးချယ်ပါ-", { 
+        reply_markup: keyboard,
+        message_thread_id: threadId 
+    });
 });
 
 // --- ၄။ Handlers ---
@@ -509,23 +528,47 @@ if (data.startsWith("standings:")) {
         if (!leagueData || !leagueData.table) {
             return ctx.reply("❌ ဇယားဒေတာ ရှာမတွေ့သေးပါ။ ခဏနေမှ ပြန်ကြိုးစားပါ။", { message_thread_id: threadId });
         }
+        
+        let tableMsg = `<b>📊 ${leagueData.leagueName} Standing</b>\n\n`;
+        tableMsg += `<code>Pos  Team       P   GD  PTS</code>\n`;
+        tableMsg += `<code>---------------------------</code>\n`;
 
-        let tableMsg = `<b>📊 ${leagueData.leagueName} Table</b>\n`;
-        tableMsg += `<code>Pos Team       P  GD Pts</code>\n`;
-        tableMsg += `<code>-------------------------</code>\n`;
-
-        // ပထမ အသင်း ၂၀ ထိပဲ ပြမယ်
         leagueData.table.slice(0, 20).forEach((row) => {
-            const pos = row.position.toString().padEnd(2, ' ');
+            // Position ကို ၂ လုံးစာ နေရာယူမယ်
+            const pos = row.position.toString().padEnd(3, ' ');
+            
+            // Team Name ကို ၁၀ လုံးပဲ ယူမယ်၊ ပြီးရင် နောက်က Space ဖြည့်မယ်
             const team = (row.team.shortName || row.team.name).substring(0, 10).padEnd(10, ' ');
-            const played = row.playedGames.toString().padEnd(2, ' ');
-            const gd = row.goalDifference.toString().padEnd(2, ' ');
-            const pts = row.points.toString().padEnd(2, ' ');
+            
+            // Played Games
+            const p = row.playedGames.toString().padStart(2, ' ');
+            
+            // Goal Difference (အပေါင်းဆိုရင် + ထည့်ပြမယ်)
+            const gdNum = row.goalDifference;
+            const gd = (gdNum > 0 ? `+${gdNum}` : gdNum.toString()).padStart(4, ' ');
+            
+            // Points
+            const pts = row.points.toString().padStart(3, ' ');
 
-            tableMsg += `<code>${pos}  ${team} ${played} ${gd} ${pts}</code>\n`;
+            // တစ်ကြောင်းချင်းစီ စုစည်းမယ်
+            tableMsg += `<code>${pos}${team} ${p} ${gd} ${pts}</code>\n`;
+        });
+        const updateTime = leagueData.lastUpdated ? new Date(leagueData.lastUpdated) : new Date();
+
+        const formattedTime = updateTime.toLocaleString('en-GB', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
         });
 
-        tableMsg += `\n📅 <i>Last Updated: ${new Date(leagueData.lastUpdated).toLocaleTimeString()}</i>`;
+        // ရက်စွဲပါ ထည့်ပြချင်ရင် ဒါလေးသုံးပါ
+        const formattedDate = updateTime.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short'
+        });
+        
+        tableMsg += `<code>---------------------------</code>\n`;
+        tableMsg += `🕒 <i>Last Update: ${formattedTime} (${formattedDate})</i>`;
 
         return ctx.reply(tableMsg, { 
             parse_mode: "HTML", 
