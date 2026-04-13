@@ -83,6 +83,6 @@ const Match = mongoose.models.Match || mongoose.model("Match", matchSchema);
 const LiveCache = mongoose.models.LiveCache || mongoose.model("LiveCache", liveCacheSchema);
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 const ApiLog = mongoose.models.ApiLog || mongoose.model("ApiLog", apiLogSchema);
-const Standing = mongoose.model("Standing", StandingSchema)|| mongoose.model("Standing", StandingSchema);;
+const Standing = mongoose.model("Standing", StandingSchema)|| mongoose.model("Standing", StandingSchema);
 // Module Exports မှာ အကုန်လုံး ပါဝင်ကြောင်း သေချာစေရမယ်
 module.exports = { connectDB, Match, LiveCache, User, ApiLog,Standing };
