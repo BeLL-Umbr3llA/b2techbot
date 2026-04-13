@@ -1,19 +1,27 @@
 const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const connectDB = async () => {
-    // ချိတ်ပြီးသားဆိုရင် ထပ်မချိတ်ဘဲ ပြန်လှည့်မယ်
-    if (mongoose.connection.readyState >= 1) return;
+    // ၁။ ချိတ်ပြီးသားဆိုရင် တန်းပြန်ထွက်မယ်
+    if (mongoose.connection.readyState >= 1) {
+        return mongoose.connection;
+    }
 
     try {
-        await mongoose.connect(process.env.MONGO_URI);
-        if (process.env.NODE_ENV !== 'production') {
-            console.log("✅ MongoDB Connected Successfully!");
-        }
+        // ၂။ Connection options တွေကို ထည့်သွင်းမယ်
+        const options = {
+            bufferCommands: false, // Connection မရခင် query တွေကို queue ထဲမထည့်ဖို့
+            serverSelectionTimeoutMS: 5000, // Database ရှာမတွေ့ရင် ၅ စက္ကန့်အတွင်း အဖြေပေးဖို့
+        };
+
+        const conn = await mongoose.connect(process.env.MONGO_URI, options);
+        
+        console.log("✅ MongoDB Connected!");
+        return conn;
     } catch (err) {
         console.error("❌ MongoDB Connection Error:", err.message);
-        if (process.env.NODE_ENV !== 'production') {
-            process.exit(1);
-        }
+        // Serverless မှာ process.exit(1) မလုပ်ပါနဲ့၊ ဒါက instance တစ်ခုလုံး သေသွားစေနိုင်လို့ပါ
+        throw err; 
     }
 };
 
