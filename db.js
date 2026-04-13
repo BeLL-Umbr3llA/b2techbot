@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const mongoose = require('mongoose');
 
 const connectDB = async () => {
     // ၁။ ချိတ်ပြီးသားဆိုရင် တန်းပြန်ထွက်မယ်
