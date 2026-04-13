@@ -104,7 +104,7 @@ if ((!oldLive || oldLive.status === 'NS') && matchStatus === '1H') {
             ? `\n\n🎯 *${randomQuote}*\n🔔 Noti: ${target.mentions.join(" ")}` 
             : "";
 
-        const kickOffMsg = `🎬 *လူကြီးမင်းတို့ Noti ယူထားတဲ့ ပွဲစပြီဗျို့!*\n\n` +
+        const kickOffMsg = `🎬 *လူကြီးမင်းတို့ Noti ယူထားတဲ့\nပွဲစဉ် စပြီဗျို့......*\n\n` +
                            `🏟️ *${m.teams.home.name}* vs *${m.teams.away.name}*\n` +
                            `🏆 ${m.league.name}${mentionText}`;
 
