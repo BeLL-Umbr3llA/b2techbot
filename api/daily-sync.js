@@ -1,10 +1,12 @@
 require('dotenv').config();
-const { connectDB, Match, LiveCache,ApiLog } = require("../db"); // Path မှန်အောင် ပြန်စစ်ပါ
+const { connectDB, Match, LiveCache,ApiLog,Standing } = require("../db"); // Path မှန်အောင် ပြန်စစ်ပါ
 
 const APISPORTS_KEY = process.env.APISPORTS_KEY;
 const TARGET_LEAGUES = [1, 2, 3, 39, 140, 135, 78, 61, 40, 88, 94, 71, 13, 848, 235];
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN; // .env မှာ ထည့်ပါ
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;     // .env မှာ ထည့်ပါ
+const ORG_LEAGUES = ['PL', 'ELC', 'FL1', 'SA', 'PPL', 'PD', 'CL', 'EC', 'WC'];
+const FOOTBALL_DATA_API_KEY = process.env.FOOTBALL_DATA_API_KEY;
 
 // Telegram ကို Message ပို့သည့် Function
 const sendTelegramUpdate = async (message) => {
@@ -97,14 +99,47 @@ const syncMatches = async () => {
             }
         }
 
+        console.log("🏆 Syncing 12 Top League Tables...");
+            let tablesUpdated = 0;
+
+        for (const code of ORG_LEAGUES) {
+            try {
+                const resG = await fetch(`https://api.football-data.org/v4/competitions/${code}/standings`, {
+                    headers: { 'X-Auth-Token': FOOTBALL_DATA_API_KEY }
+                });
+                const resDataG = await resG.json();
+
+                if (resG.status === 200 && resDataG.standings?.length > 0) {
+                    await Standing.findOneAndUpdate(
+                        { leagueId: resDataG.competition.id },
+                        { $set: {
+                            leagueId: resDataG.competition.id,
+                            leagueName: resDataG.competition.name,
+                            season: resDataG.filters.season,
+                            table: resDataG.standings[0].table,
+                            lastUpdated: new Date()
+                        }},
+                        { upsert: true }
+                    );
+                    tablesUpdated++;
+                    // loop ထဲမှာ ဒီလိုပြင်လိုက်ပါ
+                console.log(`✅ [${tablesUpdated}/${ORG_LEAGUES.length}] Updated Table: ${resDataG.competition.name}`);
+                }
+              
+            } catch (err) {
+                console.error(`❌ Standing Error (${code}):`, err.message);
+            }
+        }
+    
         console.log(`📡 going to telegram`);
 
          // ✅ Sync ပြီးတာနဲ့ Telegram ကို အသိပေးချက်ပို့ခြင်း
         const notifyMsg = '<b>✅ Daily Sync Success!</b>\n\n' +
                           '📅 Date: ' + todayUTC + '\n' +
-                          '📅 Date: ' + tomorrowUTC + '\n'
-                          +cleanupMsg + '\n' +
-                          '♻️ SyncMatches: ' + totalSynced + '\n';
+                          '📅 Date: ' + tomorrowUTC + '\n'+
+                          cleanupMsg + '\n' +
+                          '♻️ SyncMatches: ' + totalSynced + '\n'+
+                          '🏆 Tables: ' + tablesUpdated + ' leagues updated.';
 
         await sendTelegramUpdate(notifyMsg);
         console.log(`📡after going to telegram`);
